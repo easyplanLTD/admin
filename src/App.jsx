@@ -1,1662 +1,847 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 
-/* ------------------------------------------------------------------ */
-/* Constants & sample data                                             */
-/* ------------------------------------------------------------------ */
-
-const APPLIANCE_TYPES = [
-  "Washing Machine",
-  "Fridge/Freezer",
-  "Dishwasher",
-  "Oven/Cooker",
-  "Tumble Dryer",
-  "Microwave",
-];
-
-const BRANDS = [
-  "Bosch",
-  "Samsung",
-  "LG",
-  "Hotpoint",
-  "Beko",
-  "Zanussi",
-  "Whirlpool",
-  "Indesit",
-  "AEG",
-  "Miele",
-];
-
-const todayStr = () => new Date().toISOString().slice(0, 10);
-
-const initialUsers = [
-  {
-    id: "u-owner",
-    role: "owner",
-    name: "Alex Morgan",
-    email: "owner@fixflow.co.uk",
-    password: "owner123",
-    phone: "07700 900001",
-  },
-  {
-    id: "u-staff",
-    role: "staff",
-    name: "James Whitfield",
-    email: "james@fixflow.co.uk",
-    password: "staff123",
-    phone: "07700 900002",
-  },
-  {
-    id: "u-eng-dave",
-    role: "engineer",
-    name: "Dave Thompson",
-    email: "dave@fixflow.co.uk",
-    password: "eng123",
-    phone: "07700 900010",
-    payRate: 45,
-    postcodes: ["M", "SK"],
-    applianceTypes: ["Washing Machine", "Fridge/Freezer", "Dishwasher"],
-    brandExclusions: { "Fridge/Freezer": ["Miele"] },
-    integratedExclusions: ["Dishwasher"],
-    stats: { completed: 142, ber: 18 },
-    engineerType: "both",
-    leadPrefs: { active: true, dailyLeadTarget: 10, pricePerLead: 12, cardLast4: "4242" },
-  },
-  {
-    id: "u-eng-sarah",
-    role: "engineer",
-    name: "Sarah Ahmed",
-    email: "sarah@fixflow.co.uk",
-    password: "eng123",
-    phone: "07700 900011",
-    payRate: 50,
-    postcodes: ["LS", "BD"],
-    applianceTypes: ["Oven/Cooker", "Tumble Dryer", "Washing Machine"],
-    brandExclusions: {},
-    integratedExclusions: ["Oven/Cooker"],
-    stats: { completed: 98, ber: 6 },
-    engineerType: "jobs",
-    leadPrefs: { active: true, dailyLeadTarget: 15, pricePerLead: 15, cardLast4: "1881" },
-  },
-  {
-    id: "u-eng-mike",
-    role: "engineer",
-    name: "Mike O'Connor",
-    email: "mike@fixflow.co.uk",
-    password: "eng123",
-    phone: "07700 900012",
-    payRate: 42,
-    postcodes: ["B", "DY"],
-    applianceTypes: ["Dishwasher", "Fridge/Freezer", "Microwave"],
-    brandExclusions: { Dishwasher: ["AEG"] },
-    integratedExclusions: [],
-    stats: { completed: 61, ber: 14 },
-    engineerType: "leads",
-    leadPrefs: { active: true, dailyLeadTarget: 5, pricePerLead: 10, cardLast4: "3300" },
-  },
-];
-
-const initialJobs = [
-  {
-    id: "j-1001",
-    customerName: "Linda Carter",
-    phone: "07911 111222",
-    email: "linda.carter@mail.com",
-    address: "14 Ashfield Road, Manchester",
-    postcode: "M14 5TG",
-    applianceType: "Washing Machine",
-    brand: "Bosch",
-    applianceAge: "4 years",
-    isIntegrated: false,
-    faultDescription: "Not spinning, leaves clothes soaking wet",
-    notes: ["Customer available after 4pm weekdays"],
-    scheduledDate: `${todayStr()}T10:00`,
-    completedDate: null,
-    engineerId: "u-eng-dave",
-    status: "assigned",
-    priority: "normal",
-    source: "manchesterapplianceRepair.co.uk",
-    parts: { needed: false, ordered: false, arrived: false },
-    paid: false,
-    notifications: { booking: true, reminder: true, onway: false, completed: false },
-  },
-  {
-    id: "j-1002",
-    customerName: "Raj Patel",
-    phone: "07922 222333",
-    email: "raj.patel@mail.com",
-    address: "8 Kirkgate, Leeds",
-    postcode: "LS1 6HD",
-    applianceType: "Oven/Cooker",
-    brand: "AEG",
-    applianceAge: "7 years",
-    isIntegrated: false,
-    faultDescription: "Oven not heating up at all",
-    notes: [],
-    scheduledDate: `${todayStr()}T13:30`,
-    completedDate: null,
-    engineerId: "u-eng-sarah",
-    status: "in_progress",
-    priority: "high",
-    source: "leedsapplianceRepair.co.uk",
-    parts: { needed: true, ordered: true, arrived: false },
-    paid: false,
-    notifications: { booking: true, reminder: true, onway: true, completed: false },
-  },
-  {
-    id: "j-1003",
-    customerName: "Emma Wright",
-    phone: "07933 333444",
-    email: "emma.wright@mail.com",
-    address: "22 Broad Street, Birmingham",
-    postcode: "B1 2HF",
-    applianceType: "Fridge/Freezer",
-    brand: "Samsung",
-    applianceAge: "2 years",
-    isIntegrated: true,
-    faultDescription: "Fridge warm, freezer fine — food spoiling",
-    notes: ["Urgent — food spoiling"],
-    scheduledDate: `${todayStr()}T09:00`,
-    completedDate: `${todayStr()}T09:50`,
-    engineerId: "u-eng-mike",
-    status: "completed",
-    priority: "urgent",
-    source: "birminghamapplianceRepair.co.uk",
-    parts: { needed: false, ordered: false, arrived: false },
-    paid: false,
-    notifications: { booking: true, reminder: true, onway: true, completed: true },
-  },
-  {
-    id: "j-1004",
-    customerName: "Tom Baxter",
-    phone: "07944 444555",
-    email: "tom.baxter@mail.com",
-    address: "5 Mellor Street, Stockport",
-    postcode: "SK1 3PW",
-    applianceType: "Dishwasher",
-    brand: "Whirlpool",
-    applianceAge: "5 years",
-    isIntegrated: true,
-    faultDescription: "Leaking from the bottom during wash cycle",
-    notes: [],
-    scheduledDate: null,
-    completedDate: null,
-    engineerId: null,
-    status: "unassigned",
-    priority: "normal",
-    source: "manchesterapplianceRepair.co.uk",
-    parts: { needed: false, ordered: false, arrived: false },
-    paid: false,
-    notifications: { booking: true, reminder: false, onway: false, completed: false },
-  },
-];
-
-const initialLeads = [
-  {
-    id: "l-2001",
-    customerName: "Priya Nair",
-    phone: "07955 555666",
-    address: "3 Merrion Street, Leeds",
-    postcode: "LS2 8NG",
-    applianceType: "Tumble Dryer",
-    brand: "Hotpoint",
-    applianceAge: "6 years",
-    isIntegrated: false,
-    priority: "normal",
-    description: "Dryer runs but no heat",
-    source: "leedsapplianceRepair.co.uk",
-    engineerId: "u-eng-sarah",
-    status: "assigned",
-    price: 15,
-
-    billed: false,
-    createdAt: `${todayStr()}T08:15`,
-    assignedAt: `${todayStr()}T08:15`,
-  },
-  {
-    id: "l-2002",
-    customerName: "George Wallis",
-    phone: "07966 666777",
-    address: "19 Deansgate, Manchester",
-    postcode: "M3 2FW",
-    applianceType: "Washing Machine",
-    brand: "Miele",
-    applianceAge: "3 years",
-    isIntegrated: false,
-    priority: "high",
-    description: "Drum not turning, loud clicking noise",
-    source: "manchesterapplianceRepair.co.uk",
-    engineerId: "u-eng-dave",
-    status: "assigned",
-    price: 12,
-    billed: false,
-    createdAt: `${todayStr()}T09:00`,
-    assignedAt: `${todayStr()}T09:00`,
-  },
-  {
-    id: "l-2003",
-    customerName: "Helen Foster",
-    phone: "07977 777888",
-    address: "41 Colmore Row, Birmingham",
-    postcode: "B4 6AT",
-    applianceType: "Microwave",
-    brand: "Samsung",
-    applianceAge: "1 year",
-    isIntegrated: true,
-    priority: "normal",
-    description: "Turntable not rotating, sparking inside",
-    source: "birminghamapplianceRepair.co.uk",
-    engineerId: null,
-    status: "unassigned",
-    price: null,
-    billed: false,
-    createdAt: `${todayStr()}T09:40`,
-    assignedAt: null,
-  },
-  {
-    id: "l-2004",
-    customerName: "Owen Baxter",
-    phone: "07988 888999",
-    address: "2 Piccadilly, Manchester",
-    postcode: "M1 3AN",
-    applianceType: "Fridge/Freezer",
-    brand: "LG",
-    applianceAge: "8 years",
-    isIntegrated: false,
-    priority: "urgent",
-    description: "Freezer not cooling, ice building up fast",
-    source: "manchesterapplianceRepair.co.uk",
-    engineerId: "u-eng-dave",
-    status: "assigned",
-    price: 12,
-    billed: false,
-    createdAt: `${todayStr()}T07:30`,
-    assignedAt: `${todayStr()}T07:30`,
-  },
-];
-
-/* ------------------------------------------------------------------ */
-/* Helpers                                                              */
-/* ------------------------------------------------------------------ */
-
-function successRate(engineer) {
-  const { completed, ber } = engineer.stats;
-  const total = completed + ber;
-  if (total === 0) return 0;
-  return Math.round((completed / total) * 100);
-}
-
-function rateColor(rate) {
-  if (rate >= 80) return "text-emerald-600";
-  if (rate >= 60) return "text-amber-600";
-  return "text-rose-600";
-}
-
-function postcodeMatches(engineer, postcode) {
-  const p = (postcode || "").toUpperCase().replace(/\s/g, "");
-  return engineer.postcodes.some((prefix) => p.startsWith(prefix.toUpperCase()));
-}
-
-function handlesAppliance(engineer, applianceType, brand, isIntegrated) {
-  if (!engineer.applianceTypes.includes(applianceType)) return false;
-  const excludedBrands = engineer.brandExclusions[applianceType] || [];
-  if (excludedBrands.includes(brand)) return false;
-  const avoidsIntegrated = (engineer.integratedExclusions || []).includes(applianceType);
-  if (isIntegrated && avoidsIntegrated) return false;
-  return true;
-}
-
-function ineligibleReason(engineer, job) {
-  if (!postcodeMatches(engineer, job.postcode)) return "Doesn't cover this postcode area";
-  if (!engineer.applianceTypes.includes(job.applianceType)) return `Doesn't repair ${job.applianceType.toLowerCase()}`;
-  const excludedBrands = engineer.brandExclusions[job.applianceType] || [];
-  if (excludedBrands.includes(job.brand)) return `Won't work on ${job.brand}`;
-  if (job.isIntegrated && (engineer.integratedExclusions || []).includes(job.applianceType)) return "Won't work on integrated/built-in units";
-  return "Doesn't match this job";
-}
-
-function activeJobCount(jobs, engineerId) {
-  return jobs.filter(
-    (j) => j.engineerId === engineerId && !["completed", "beyond_repair"].includes(j.status)
-  ).length;
-}
-
-function leadsAssignedToday(leads, engineerId) {
-  const today = todayStr();
-  return leads.filter(
-    (l) => l.engineerId === engineerId && l.assignedAt && l.assignedAt.startsWith(today)
-  ).length;
-}
-
-function findBestEngineerForJob(engineers, jobs, job) {
-  const eligible = engineers.filter(
-    (e) =>
-      e.engineerType !== "leads" &&
-      postcodeMatches(e, job.postcode) &&
-      handlesAppliance(e, job.applianceType, job.brand, job.isIntegrated)
-  );
-  if (!eligible.length) return null;
-  eligible.sort((a, b) => {
-    const r = successRate(b) - successRate(a);
-    if (r !== 0) return r;
-    return activeJobCount(jobs, a.id) - activeJobCount(jobs, b.id);
-  });
-  return eligible[0];
-}
-
-// Leads are pooled by area: any engineer whose postcode coverage matches the
-// lead's postcode, and who repairs that appliance type/brand, is in the same
-// pool. Within a pool, leads are handed out to whoever is furthest below
-// their own daily target first, so everyone's target fills evenly across the
-// day instead of the top performer soaking up the whole pool. Success rate
-// is only used to break ties between engineers at the same distance from
-// their target.
-function findBestEngineerForLead(engineers, leads, lead) {
-  const eligible = engineers.filter(
-    (e) =>
-      e.engineerType !== "jobs" &&
-      e.leadPrefs.active &&
-      postcodeMatches(e, lead.postcode) &&
-      handlesAppliance(e, lead.applianceType, lead.brand, lead.isIntegrated) &&
-      leadsAssignedToday(leads, e.id) < e.leadPrefs.dailyLeadTarget
-  );
-  if (!eligible.length) return null;
-  eligible.sort((a, b) => {
-    const aFraction = leadsAssignedToday(leads, a.id) / a.leadPrefs.dailyLeadTarget;
-    const bFraction = leadsAssignedToday(leads, b.id) / b.leadPrefs.dailyLeadTarget;
-    if (aFraction !== bFraction) return aFraction - bFraction; // furthest below their own target goes first
-    return successRate(b) - successRate(a);
-  });
-  return eligible[0];
-}
-
-function fmtMoney(n) {
-  return `£${Number(n || 0).toFixed(2)}`;
-}
-
-function fmtDateTime(dt) {
-  if (!dt) return "—";
-  const d = new Date(dt);
-  return d.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-}
-
-const STATUS_STYLES = {
-  unassigned: "bg-amber-100 text-amber-800",
-  assigned: "bg-blue-100 text-blue-800",
-  in_progress: "bg-indigo-100 text-indigo-800",
-  completed: "bg-emerald-100 text-emerald-800",
-  beyond_repair: "bg-rose-100 text-rose-800",
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+const APPLIANCE_TYPES = ["Washing Machine","Tumble Dryer","Dishwasher","Fridge/Freezer","Oven/Cooker","Hob","Microwave"];
+const BRANDS = {
+  "Washing Machine":["AEG","Beko","Bosch","Candy","Hoover","Hotpoint","Indesit","LG","Miele","Samsung","Siemens","Whirlpool","Zanussi","Other"],
+  "Tumble Dryer":   ["AEG","Beko","Bosch","Candy","Hoover","Hotpoint","Indesit","LG","Miele","Samsung","Siemens","Whirlpool","Zanussi","Other"],
+  "Dishwasher":     ["AEG","Beko","Bosch","Candy","Hoover","Hotpoint","Indesit","LG","Miele","Samsung","Siemens","Whirlpool","Zanussi","Other"],
+  "Fridge/Freezer": ["AEG","Beko","Bosch","Candy","Haier","Hotpoint","Indesit","LG","Miele","Samsung","Siemens","Whirlpool","Zanussi","Other"],
+  "Oven/Cooker":    ["AEG","Beko","Bosch","Candy","Hotpoint","Indesit","Neff","Rangemaster","Samsung","Siemens","Smeg","Other"],
+  "Hob":            ["AEG","Beko","Bosch","Candy","Hotpoint","Indesit","Neff","Siemens","Smeg","Other"],
+  "Microwave":      ["Bosch","Hotpoint","LG","Panasonic","Samsung","Sharp","Siemens","Other"],
 };
+const SOURCES  = ["Manchester Site","Leeds Site","Sheffield Site","Liverpool Site","Birmingham Site","Direct Call","Other"];
+const STATUSES = ["Booked","Assigned","Parts Awaited","In Progress","Completed","Beyond Repair","Cancelled"];
+const TODAY    = "2026-06-06";
 
-const LEAD_STATUS_STYLES = {
-  unassigned: "bg-slate-200 text-slate-700",
-  assigned: "bg-violet-100 text-violet-800",
-};
+// ─── SEED DATA ───────────────────────────────────────────────────────────────
+const SEED_ENGINEERS = [
+  { id:"e1", name:"Dave Hartley",   phone:"07700 900111", email:"dave@fixflow.co.uk",   rate:45,
+    postcodes:["M","M1","M2","M3","M4","M20","M21","SK"],
+    applianceTypes:["Washing Machine","Tumble Dryer","Dishwasher","Fridge/Freezer"],
+    brandExclusions:{"Washing Machine":["Miele"],"Tumble Dryer":["Miele"],"Dishwasher":[],"Fridge/Freezer":["Miele"]},
+    stats:{repairs:47,beyondRepair:6} },
+  { id:"e2", name:"Marcus Webb",    phone:"07700 900222", email:"marcus@fixflow.co.uk",  rate:50,
+    postcodes:["LS","LS1","LS2","LS3","BD","HX","WF","B","B2"],
+    applianceTypes:["Washing Machine","Oven/Cooker","Hob","Dishwasher","Microwave"],
+    brandExclusions:{"Washing Machine":[],"Oven/Cooker":["Smeg","Rangemaster"],"Hob":[],"Dishwasher":[],"Microwave":[]},
+    stats:{repairs:31,beyondRepair:3} },
+  { id:"e3", name:"Kezia Thompson", phone:"07700 900333", email:"kezia@fixflow.co.uk",  rate:48,
+    postcodes:["L","L1","L2","L3","L4","CH","WA","PR","S","S3"],
+    applianceTypes:["Washing Machine","Tumble Dryer","Fridge/Freezer","Oven/Cooker","Hob"],
+    brandExclusions:{"Washing Machine":[],"Tumble Dryer":[],"Fridge/Freezer":[],"Oven/Cooker":[],"Hob":[]},
+    stats:{repairs:52,beyondRepair:4} },
+];
 
-const PRIORITY_STYLES = {
-  normal: "bg-slate-100 text-slate-600",
-  high: "bg-amber-100 text-amber-800",
-  urgent: "bg-rose-100 text-rose-800",
-};
+const SEED_USERS = [
+  { id:"u1", name:"Sarah Mitchell", email:"owner@fixflow.co.uk",  password:"owner123", role:"owner",    avatar:"SM" },
+  { id:"u2", name:"James Okafor",   email:"james@fixflow.co.uk",  password:"staff123", role:"staff",    avatar:"JO" },
+  { id:"u3", name:"Priya Nair",     email:"priya@fixflow.co.uk",  password:"staff456", role:"staff",    avatar:"PN" },
+  { id:"u4", name:"Dave Hartley",   email:"dave@fixflow.co.uk",   password:"eng123",   role:"engineer", avatar:"DH", engineerId:"e1" },
+  { id:"u5", name:"Marcus Webb",    email:"marcus@fixflow.co.uk", password:"eng456",   role:"engineer", avatar:"MW", engineerId:"e2" },
+  { id:"u6", name:"Kezia Thompson", email:"kezia@fixflow.co.uk",  password:"eng789",   role:"engineer", avatar:"KT", engineerId:"e3" },
+];
 
-/* ------------------------------------------------------------------ */
-/* Small UI atoms                                                       */
-/* ------------------------------------------------------------------ */
+const SEED_JOBS = [
+  { id:1001, customer:"Janet Moore",   phone:"07811 234567", email:"janet@email.com",    address:"14 Oak St, Manchester, M1 4AB",    postcode:"M1",  appliance:"Washing Machine", brand:"Hotpoint", applianceAge:5, issue:"Won't spin – loud noise",       source:"Manchester Site", status:"Completed",     engineerId:"e1", scheduledDate:"2026-06-02", scheduledTime:"09:00", completedDate:"2026-06-02", priority:"Normal", partsNeeded:false,partsOrdered:false,partsArrived:false, rate:45, paid:true,  notes:"Drum bearing replaced.", notifBooking:true,notifReminder:true,notifOnWay:true,notifComplete:true  },
+  { id:1002, customer:"Robert Singh",  phone:"07922 345678", email:"rsingh@email.com",   address:"7 Birch Lane, Leeds, LS2 9JQ",     postcode:"LS2", appliance:"Fridge/Freezer",  brand:"Samsung",  applianceAge:3, issue:"Not cooling at all",            source:"Leeds Site",      status:"Parts Awaited", engineerId:"e2", scheduledDate:"2026-06-07", scheduledTime:"10:30", completedDate:null,         priority:"Urgent", partsNeeded:true, partsOrdered:true, partsArrived:false, rate:50, paid:false, notes:"Parts ETA Monday.",      notifBooking:true,notifReminder:false,notifOnWay:false,notifComplete:false },
+  { id:1003, customer:"Claire Watson", phone:"07733 456789", email:"cwatson@email.com",  address:"22 Maple Rd, Sheffield, S3 8BN",   postcode:"S3",  appliance:"Dishwasher",      brand:"Bosch",    applianceAge:7, issue:"Leaking from base",             source:"Sheffield Site",  status:"Booked",        engineerId:null, scheduledDate:"2026-06-09", scheduledTime:"14:00", completedDate:null,         priority:"Normal", partsNeeded:false,partsOrdered:false,partsArrived:false, rate:null,paid:false, notes:"",                       notifBooking:true,notifReminder:false,notifOnWay:false,notifComplete:false },
+  { id:1004, customer:"Tom Bradley",   phone:"07844 567890", email:"tbradley@email.com", address:"5 Elm Close, Liverpool, L4 2TH",   postcode:"L4",  appliance:"Oven/Cooker",     brand:"Hotpoint", applianceAge:4, issue:"Not heating – element gone",    source:"Liverpool Site",  status:"Assigned",      engineerId:"e3", scheduledDate:"2026-06-10", scheduledTime:"11:00", completedDate:null,         priority:"High",   partsNeeded:true, partsOrdered:true, partsArrived:false, rate:48, paid:false, notes:"Element ordered.",        notifBooking:true,notifReminder:false,notifOnWay:false,notifComplete:false },
+  { id:1005, customer:"Anita Sharma",  phone:"07955 678901", email:"anita@email.com",    address:"88 Pine Ave, Manchester, M20 6GR", postcode:"M20", appliance:"Tumble Dryer",    brand:"AEG",      applianceAge:2, issue:"Not drying – 3+ cycles needed", source:"Manchester Site", status:"In Progress",   engineerId:"e1", scheduledDate:"2026-06-06", scheduledTime:"13:00", completedDate:null,         priority:"Normal", partsNeeded:false,partsOrdered:false,partsArrived:false, rate:45, paid:false, notes:"Engineer on site.",      notifBooking:true,notifReminder:true,notifOnWay:true,notifComplete:false },
+  { id:1006, customer:"Liam Foster",   phone:"07612 789012", email:"liam@email.com",     address:"3 Cedar Mews, Birmingham, B2 5ST", postcode:"B2",  appliance:"Washing Machine", brand:"Beko",     applianceAge:8, issue:"Error code E3, door stuck",     source:"Birmingham Site", status:"Beyond Repair", engineerId:"e2", scheduledDate:"2026-06-04", scheduledTime:"09:30", completedDate:"2026-06-04", priority:"Normal", partsNeeded:false,partsOrdered:false,partsArrived:false, rate:50, paid:false, notes:"Parts unavailable, BER.", notifBooking:true,notifReminder:true,notifOnWay:true,notifComplete:true  },
+  { id:1007, customer:"Nina Patel",    phone:"07521 890123", email:"nina@email.com",     address:"61 Sycamore Dr, Liverpool, L2 9QP",postcode:"L2",  appliance:"Washing Machine", brand:"LG",       applianceAge:6, issue:"Drum cracked",                  source:"Liverpool Site",  status:"Completed",     engineerId:"e3", scheduledDate:"2026-05-28", scheduledTime:"10:00", completedDate:"2026-05-28", priority:"Normal", partsNeeded:true, partsOrdered:true, partsArrived:true,  rate:48, paid:true,  notes:"Drum replaced.",         notifBooking:true,notifReminder:true,notifOnWay:true,notifComplete:true  },
+];
 
-function Pill({ className, children }) {
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${className}`}>
-      {children}
-    </span>
-  );
-}
+let _nextJobId = 1008;
+let _nextUserId = 7;
+let _nextEngId  = 4;
 
-function Modal({ title, onClose, children, footer, wide }) {
-  return (
-    <div className="fixed inset-0 bg-slate-900/50 z-50 overflow-y-auto p-4">
-      <div className={`bg-white rounded-xl shadow-xl w-full ${wide ? "max-w-3xl" : "max-w-lg"} mx-auto my-8`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">
-            ×
-          </button>
-        </div>
-        <div className="p-6">{children}</div>
-        {footer && <div className="px-6 py-4 border-t border-slate-200 rounded-b-xl">{footer}</div>}
-      </div>
-    </div>
-  );
-}
+// ─── AUTO-ASSIGN ─────────────────────────────────────────────────────────────
+function autoAssign(job, engineers, jobs) {
+  const pc = (job.postcode || "").toUpperCase().trim();
+  const pcAlpha = pc.replace(/[0-9\s]+$/, "");
 
-function Field({ label, children }) {
-  return (
-    <label className="block mb-3">
-      <span className="block text-xs font-medium text-slate-500 mb-1">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-const inputCls =
-  "w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500";
-
-/* ------------------------------------------------------------------ */
-/* Login                                                                */
-/* ------------------------------------------------------------------ */
-
-function LoginScreen({ users, onLogin }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-
-  function attemptLogin(emailVal, passwordVal) {
-    const u = users.find(
-      (u) =>
-        u.email.trim().toLowerCase() === emailVal.trim().toLowerCase() &&
-        u.password === passwordVal.trim()
-    );
-    if (u) {
-      setError("");
-      onLogin(u);
-    } else {
-      setError("Incorrect email or password.");
-    }
-  }
-
-  function submit(e) {
-    e.preventDefault();
-    attemptLogin(email, password);
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 text-white">
-            <div className="w-9 h-9 rounded-lg bg-teal-500 flex items-center justify-center font-bold">F</div>
-            <span className="text-2xl font-bold tracking-tight">FixFlow Pro</span>
-          </div>
-          <p className="text-slate-400 text-sm mt-2">Appliance repair operations & lead marketplace</p>
-        </div>
-        <form onSubmit={submit} className="bg-white rounded-xl shadow-xl p-6">
-          <Field label="Email">
-            <input className={inputCls} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@fixflow.co.uk" />
-          </Field>
-          <Field label="Password">
-            <input className={inputCls} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-          </Field>
-          {error && <p className="text-rose-600 text-sm mb-3">{error}</p>}
-          <button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-lg py-2.5 transition">
-            Log in
-          </button>
-        </form>
-        <div className="mt-5 bg-slate-800 rounded-lg p-4 text-xs text-slate-300">
-          <p className="font-semibold text-slate-200 mb-3">Demo logins — click to log straight in</p>
-          <div className="space-y-1.5">
-            {[
-              { label: "Owner", email: "owner@fixflow.co.uk", password: "owner123" },
-              { label: "Staff", email: "james@fixflow.co.uk", password: "staff123" },
-              { label: "Engineer (Dave)", email: "dave@fixflow.co.uk", password: "eng123" },
-              { label: "Engineer (Sarah)", email: "sarah@fixflow.co.uk", password: "eng123" },
-              { label: "Engineer (Mike)", email: "mike@fixflow.co.uk", password: "eng123" },
-            ].map((d) => (
-              <button
-                key={d.email}
-                onClick={() => attemptLogin(d.email, d.password)}
-                className="w-full flex items-center justify-between bg-slate-700 hover:bg-slate-600 rounded-md px-3 py-2 transition text-left"
-              >
-                <span className="text-slate-200 font-medium">{d.label}</span>
-                <span className="text-slate-400">{d.email}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Sidebar                                                              */
-/* ------------------------------------------------------------------ */
-
-function Sidebar({ currentUser, activeView, setActiveView, onLogout }) {
-  const nav = [
-    { key: "dashboard", label: "Dashboard", roles: ["owner", "staff"] },
-    { key: "jobs", label: "All Jobs", roles: ["owner", "staff"] },
-    { key: "myjobs", label: "My Jobs", roles: ["engineer"], engineerTypes: ["jobs", "both"] },
-    { key: "leads", label: "Lead Engineers", roles: ["owner", "staff"] },
-    { key: "myleads", label: "My Leads", roles: ["engineer"], engineerTypes: ["leads", "both"] },
-    { key: "engineers", label: "Engineers", roles: ["owner", "staff"] },
-    { key: "payments", label: "Payments & Billing", roles: ["owner", "staff"] },
-    { key: "users", label: "User Accounts", roles: ["owner"] },
-  ];
-
-  const visibleNav = nav.filter((n) => {
-    if (!n.roles.includes(currentUser.role)) return false;
-    if (currentUser.role === "engineer" && n.engineerTypes) {
-      return n.engineerTypes.includes(currentUser.engineerType);
-    }
+  const eligible = engineers.filter(eng => {
+    const covers = eng.postcodes.some(p => {
+      const up = p.toUpperCase();
+      return pc === up || pc.startsWith(up) || pcAlpha === up;
+    });
+    if (!covers) return false;
+    if (!eng.applianceTypes.includes(job.appliance)) return false;
+    const excl = eng.brandExclusions[job.appliance] || [];
+    if (job.brand && excl.includes(job.brand)) return false;
     return true;
   });
 
-  return (
-    <div className="w-56 bg-slate-900 text-slate-300 flex flex-col shrink-0 min-h-screen">
-      <div className="px-5 py-5 flex items-center gap-2 border-b border-slate-800">
-        <div className="w-8 h-8 rounded-lg bg-teal-500 flex items-center justify-center font-bold text-white text-sm">F</div>
-        <span className="text-white font-bold tracking-tight">FixFlow Pro</span>
+  if (!eligible.length) return null;
+
+  return eligible.sort((a, b) => {
+    const totA = a.stats.repairs + a.stats.beyondRepair;
+    const totB = b.stats.repairs + b.stats.beyondRepair;
+    const rA = totA ? a.stats.repairs / totA : 0;
+    const rB = totB ? b.stats.repairs / totB : 0;
+    if (Math.abs(rA - rB) > 0.02) return rB - rA;
+    const actA = jobs.filter(j => j.engineerId === a.id && !["Completed","Beyond Repair","Cancelled"].includes(j.status)).length;
+    const actB = jobs.filter(j => j.engineerId === b.id && !["Completed","Beyond Repair","Cancelled"].includes(j.status)).length;
+    return actA - actB;
+  })[0];
+}
+
+// ─── TOKENS — EasyRepair brand ───────────────────────────────────────────────
+const C = {
+  bg:"#000000",     card:"#141414",   sidebar:"#000000",
+  primary:"#d4ff3c",  primaryLight:"rgba(212,255,60,0.12)",
+  success:"#4ade80",  successLight:"rgba(74,222,128,0.12)",
+  warn:"#fbbf24",     warnLight:"rgba(251,191,36,0.12)",
+  danger:"#f87171",   dangerLight:"rgba(248,113,113,0.12)",
+  purple:"#c084fc",   purpleLight:"rgba(192,132,252,0.12)",
+  text:"#F1F5F9", mid:"#94A3B8", light:"#475569", border:"#262626",
+};
+const STATUS_C = {
+  "Booked":        {bg:"rgba(251,191,36,0.15)",  t:"#fbbf24", dot:"#fbbf24"},
+  "Assigned":      {bg:"rgba(212,255,60,0.12)",  t:"#d4ff3c", dot:"#d4ff3c"},
+  "Parts Awaited": {bg:"rgba(192,132,252,0.15)", t:"#c084fc", dot:"#c084fc"},
+  "In Progress":   {bg:"rgba(251,146,60,0.15)",  t:"#fb923c", dot:"#fb923c"},
+  "Completed":     {bg:"rgba(74,222,128,0.15)",  t:"#4ade80", dot:"#4ade80"},
+  "Beyond Repair": {bg:"rgba(248,113,113,0.15)", t:"#f87171", dot:"#f87171"},
+  "Cancelled":     {bg:"rgba(100,116,139,0.15)", t:"#64748B", dot:"#64748B"},
+};
+const ROLE_C = {
+  owner:   {label:"Owner",    color:"#c084fc", bg:"rgba(192,132,252,0.15)"},
+  staff:   {label:"Staff",    color:"#d4ff3c", bg:"rgba(212,255,60,0.12)"},
+  engineer:{label:"Engineer", color:"#4ade80", bg:"rgba(74,222,128,0.12)"},
+};
+
+const inp = {width:"100%",padding:"8px 11px",border:"1.5px solid #262626",borderRadius:7,fontSize:13,color:"#F1F5F9",background:"#000000",boxSizing:"border-box",fontFamily:"inherit",outline:"none"};
+const ta  = {...inp,resize:"vertical",minHeight:68};
+const fmt = d => d ? new Date(d+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—";
+const pct = (a,b) => b===0 ? "—" : Math.round(a/b*100)+"%";
+
+// ─── ATOMS ───────────────────────────────────────────────────────────────────
+const Badge = ({status}) => {
+  const c = STATUS_C[status]||STATUS_C["Booked"];
+  return <span style={{background:c.bg,color:c.t,padding:"2px 9px",borderRadius:20,fontSize:11,fontWeight:700,display:"inline-flex",alignItems:"center",gap:4,whiteSpace:"nowrap"}}><span style={{width:6,height:6,borderRadius:"50%",background:c.dot,flexShrink:0}}/>{status}</span>;
+};
+const PBadge = ({p}) => {
+  const m={Normal:{bg:"rgba(100,116,139,0.2)",t:"#94A3B8"},High:{bg:"rgba(251,191,36,0.15)",t:"#fbbf24"},Urgent:{bg:"rgba(248,113,113,0.15)",t:"#f87171"}}[p]||{bg:"rgba(100,116,139,0.2)",t:"#94A3B8"};
+  return <span style={{background:m.bg,color:m.t,padding:"2px 7px",borderRadius:4,fontSize:10,fontWeight:800,letterSpacing:.5}}>{(p||"Normal").toUpperCase()}</span>;
+};
+const RolePill = ({role}) => {
+  const m=ROLE_C[role]||ROLE_C.staff;
+  return <span style={{background:m.bg,color:m.color,padding:"2px 9px",borderRadius:12,fontSize:11,fontWeight:700}}>{m.label}</span>;
+};
+const Av = ({initials,size=32,color=C.primary}) =>
+  <div style={{width:size,height:size,borderRadius:"50%",background:color,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:size*.34,flexShrink:0}}>{initials}</div>;
+const StatCard = ({label,value,sub,color="#d4ff3c"}) =>
+  <div style={{background:C.card,borderRadius:11,padding:"16px 18px",borderLeft:`4px solid ${color}`,flex:1,minWidth:120,boxShadow:"0 4px 16px rgba(0,0,0,.3)"}}><div style={{fontSize:24,fontWeight:900,color:C.text}}>{value}</div><div style={{fontSize:11,color:C.mid,marginTop:1}}>{label}</div>{sub&&<div style={{fontSize:10,color,fontWeight:700,marginTop:2}}>{sub}</div>}</div>;
+const Fl = ({label,children}) =>
+  <div style={{marginBottom:11}}><div style={{fontSize:10,fontWeight:700,color:C.light,textTransform:"uppercase",letterSpacing:.7,marginBottom:4}}>{label}</div>{children}</div>;
+const Btn = ({onClick,children,variant="primary",sm,full,style:s={}}) => {
+  const v={
+    primary:{bg:"#d4ff3c",c:"#000000"},
+    ghost:  {bg:"rgba(255,255,255,0.07)",c:"#94A3B8"},
+    danger: {bg:"rgba(248,113,113,0.15)",c:"#f87171"},
+    success:{bg:"rgba(74,222,128,0.15)",c:"#4ade80"},
+  }[variant]||{bg:"#d4ff3c",c:"#000000"};
+  return <button onClick={onClick} style={{background:v.bg,color:v.c,border:"none",borderRadius:7,padding:sm?"5px 10px":"9px 16px",fontWeight:700,fontSize:sm?11:13,cursor:"pointer",fontFamily:"inherit",width:full?"100%":"auto",...s}}>{children}</button>;
+};
+
+// ─── MODAL ───────────────────────────────────────────────────────────────────
+const Modal = ({title,onClose,children,wide}) => (
+  <div style={{position:"fixed",inset:0,background:"rgba(10,15,30,.6)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:12}} onClick={onClose}>
+    <div style={{background:C.card,borderRadius:14,width:"100%",maxWidth:wide?840:620,maxHeight:"93vh",overflowY:"auto",boxShadow:"0 24px 80px rgba(0,0,0,.3)"}} onClick={e=>e.stopPropagation()}>
+      <div style={{padding:"15px 22px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,background:C.card,zIndex:1}}>
+        <div style={{fontWeight:800,fontSize:15,color:C.text}}>{title}</div>
+        <button onClick={onClose} style={{background:"rgba(255,255,255,0.06)",border:"none",width:26,height:26,borderRadius:"50%",cursor:"pointer",fontSize:16,color:C.mid,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
       </div>
-      <nav className="flex-1 py-4 space-y-1 px-3">
-        {visibleNav.map((n) => (
-            <button
-              key={n.key}
-              onClick={() => setActiveView(n.key)}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition ${
-                activeView === n.key ? "bg-teal-600 text-white" : "hover:bg-slate-800 text-slate-300"
-              }`}
-            >
-              {n.label}
-            </button>
-          ))}
-      </nav>
-      <div className="px-4 py-4 border-t border-slate-800">
-        <p className="text-sm font-medium text-white">{currentUser.name}</p>
-        <p className="text-xs text-slate-400 capitalize mb-3">{currentUser.role}</p>
-        <button onClick={onLogout} className="text-xs text-slate-400 hover:text-white underline">
-          Log out
-        </button>
+      <div style={{padding:"18px 22px"}}>{children}</div>
+    </div>
+  </div>
+);
+
+// ─── LOGIN ────────────────────────────────────────────────────────────────────
+function Login({onLogin}) {
+  const [email,setEmail]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
+  const go = () => { setErr(""); setLoading(true); setTimeout(()=>{ const u=SEED_USERS.find(x=>x.email.toLowerCase()===email.toLowerCase()&&x.password===pass); u?onLogin(u):(setErr("Incorrect email or password."),setLoading(false)); },400); };
+  return (
+    <div style={{minHeight:"100vh",background:"#000000",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Inter','Segoe UI',sans-serif",padding:16}}>
+      <div style={{width:"100%",maxWidth:420}}>
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <img src="/logo.png" alt="Easy Repair" style={{height:40,margin:"0 auto 10px",display:"block"}}/>
+          <div style={{color:"#475569",fontSize:11,marginTop:2}}>FixFlow — Internal Portal</div>
+        </div>
+        <div style={{background:"#141414",borderRadius:16,padding:30,boxShadow:"0 24px 80px rgba(0,0,0,.6)",border:"1px solid #262626"}}>
+          <Fl label="Email"><input style={inp} value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@easyrepair.co.uk" onKeyDown={e=>e.key==="Enter"&&go()}/></Fl>
+          <Fl label="Password"><input type="password" style={inp} value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&go()}/></Fl>
+          {err&&<div style={{background:"rgba(248,113,113,0.15)",color:"#f87171",borderRadius:7,padding:"8px 12px",fontSize:13,marginBottom:12,fontWeight:600,border:"1px solid rgba(248,113,113,0.3)"}}>{err}</div>}
+          <Btn onClick={go} full style={{padding:"12px 0",fontSize:14,opacity:loading?.7:1}}>{loading?"Signing in…":"Sign In →"}</Btn>
+          <div style={{marginTop:18,background:"#000000",borderRadius:8,padding:12,border:"1px solid #262626"}}>
+            <div style={{fontSize:10,color:"#475569",fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.5}}>Demo Logins</div>
+            {SEED_USERS.map(u=><div key={u.id} style={{fontSize:11,color:"#475569",marginBottom:2,display:"flex",justifyContent:"space-between"}}><span style={{color:ROLE_C[u.role].color,fontWeight:700}}>{ROLE_C[u.role].label}</span><span>{u.email} / {u.password}</span></div>)}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Dashboard                                                            */
-/* ------------------------------------------------------------------ */
+// ─── JOB FORM ─────────────────────────────────────────────────────────────────
+function JobForm({initial,onSave,onCancel,canEditRate,engineers,jobs}) {
+  const blank = {customer:"",phone:"",email:"",address:"",postcode:"",appliance:APPLIANCE_TYPES[0],brand:"",applianceAge:"",issue:"",source:SOURCES[0],status:"Booked",engineerId:null,scheduledDate:"",scheduledTime:"09:00",completedDate:"",priority:"Normal",partsNeeded:false,partsOrdered:false,partsArrived:false,rate:"",paid:false,notes:""};
+  const [f,setF] = useState(initial?{...initial,rate:initial.rate??""}:blank);
+  const [hint,setHint] = useState(null);
+  const set = (k,v) => setF(p=>({...p,[k]:v}));
+  const brandList = BRANDS[f.appliance]||[];
 
-function DashboardView({ jobs, engineers }) {
-  const today = todayStr();
-  const todaysJobs = jobs.filter((j) => j.scheduledDate && j.scheduledDate.startsWith(today));
-  const unassigned = jobs.filter((j) => j.status === "unassigned");
-  const outstanding = jobs.filter((j) => j.status === "completed" && !j.paid);
-  const outstandingTotal = outstanding.reduce((sum, j) => {
-    const eng = engineers.find((e) => e.id === j.engineerId);
-    return sum + (eng ? eng.payRate : 0);
-  }, 0);
+  const tryAuto = () => {
+    const s = autoAssign(f, engineers, jobs);
+    if (s) { setHint({type:"ok",msg:`Best match: ${s.name} (${Math.round(s.stats.repairs/(s.stats.repairs+s.stats.beyondRepair)*100)||0}% success rate)`}); set("engineerId",s.id); if(!f.rate&&canEditRate) set("rate",s.rate); }
+    else setHint({type:"err",msg:"No eligible engineer found for this postcode, appliance and brand combination."});
+  };
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">Dashboard</h1>
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <p className="text-sm text-slate-500">Jobs today</p>
-          <p className="text-3xl font-bold text-slate-800">{todaysJobs.length}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <p className="text-sm text-slate-500">Unassigned jobs</p>
-          <p className="text-3xl font-bold text-amber-600">{unassigned.length}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <p className="text-sm text-slate-500">Outstanding engineer pay</p>
-          <p className="text-3xl font-bold text-slate-800">{fmtMoney(outstandingTotal)}</p>
-        </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <Fl label="Customer Name"><input style={inp} value={f.customer} onChange={e=>set("customer",e.target.value)} placeholder="Full name"/></Fl>
+        <Fl label="Phone"><input style={inp} value={f.phone} onChange={e=>set("phone",e.target.value)} placeholder="07..."/></Fl>
+        <Fl label="Email"><input style={inp} value={f.email} onChange={e=>set("email",e.target.value)}/></Fl>
+        <Fl label="Source Website"><select style={inp} value={f.source} onChange={e=>set("source",e.target.value)}>{SOURCES.map(s=><option key={s}>{s}</option>)}</select></Fl>
+      </div>
+      <Fl label="Full Address (inc. postcode)"><input style={inp} value={f.address} onChange={e=>set("address",e.target.value)} placeholder="Street, City, Postcode"/></Fl>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+        <Fl label="Postcode area (for matching)"><input style={inp} value={f.postcode} onChange={e=>set("postcode",e.target.value.toUpperCase())} placeholder="e.g. M1 or LS2"/></Fl>
+        <Fl label="Appliance Type"><select style={inp} value={f.appliance} onChange={e=>{set("appliance",e.target.value);set("brand","");}}>{APPLIANCE_TYPES.map(a=><option key={a}>{a}</option>)}</select></Fl>
+        <Fl label="Brand"><select style={inp} value={f.brand} onChange={e=>set("brand",e.target.value)}><option value="">— Select —</option>{brandList.map(b=><option key={b}>{b}</option>)}</select></Fl>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+        <Fl label="Appliance Age (years)"><input type="number" min="0" max="30" style={inp} value={f.applianceAge} onChange={e=>set("applianceAge",e.target.value)} placeholder="e.g. 5"/></Fl>
+        <Fl label="Priority"><select style={inp} value={f.priority} onChange={e=>set("priority",e.target.value)}><option>Normal</option><option>High</option><option>Urgent</option></select></Fl>
+        <Fl label="Status"><select style={inp} value={f.status} onChange={e=>set("status",e.target.value)}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></Fl>
+      </div>
+      <Fl label="Fault Description"><textarea style={ta} value={f.issue} onChange={e=>set("issue",e.target.value)} placeholder="Describe the fault in detail..."/></Fl>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <Fl label="Scheduled Date"><input type="date" style={inp} value={f.scheduledDate} onChange={e=>set("scheduledDate",e.target.value)}/></Fl>
+        <Fl label="Scheduled Time"><input type="time" style={inp} value={f.scheduledTime} onChange={e=>set("scheduledTime",e.target.value)}/></Fl>
       </div>
 
-      {unassigned.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-          <p className="font-medium text-amber-800 mb-2">Unassigned jobs need attention</p>
-          {unassigned.map((j) => (
-            <div key={j.id} className="text-sm text-amber-800">
-              {j.customerName} — {j.applianceType} ({j.postcode})
+      <div style={{background:C.primaryLight,border:`1px solid #BFDBFE`,borderRadius:9,padding:"12px 14px",marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <span style={{fontSize:12,fontWeight:700,color:C.primary}}>Engineer Assignment</span>
+          <Btn onClick={tryAuto} sm>⚡ Auto-Assign Best Match</Btn>
+        </div>
+        {hint&&<div style={{fontSize:12,fontWeight:600,marginBottom:8,color:hint.type==="ok"?C.success:C.danger}}>{hint.type==="ok"?"✓":"✕"} {hint.msg}</div>}
+        <select style={inp} value={f.engineerId||""} onChange={e=>{const v=e.target.value;set("engineerId",v||null);if(v&&!f.rate&&canEditRate){const en=engineers.find(x=>x.id===v);if(en)set("rate",en.rate);}}}>
+          <option value="">— Unassigned —</option>
+          {engineers.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+        </select>
+      </div>
+
+      {canEditRate&&(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Fl label="Engineer Rate (£)"><input type="number" style={inp} value={f.rate} onChange={e=>set("rate",e.target.value)}/></Fl>
+          <Fl label="Date Completed"><input type="date" style={inp} value={f.completedDate||""} onChange={e=>set("completedDate",e.target.value)}/></Fl>
+        </div>
+      )}
+      <div style={{display:"flex",gap:18,marginBottom:12,flexWrap:"wrap"}}>
+        {[["partsNeeded","Parts needed"],["partsOrdered","Parts ordered"],["partsArrived","Parts arrived"],...(canEditRate?[["paid","Engineer paid"]]:[])] .map(([k,l])=>(
+          <label key={k} style={{display:"flex",alignItems:"center",gap:5,fontSize:13,cursor:"pointer"}}><input type="checkbox" checked={!!f[k]} onChange={e=>set(k,e.target.checked)}/>{l}</label>
+        ))}
+      </div>
+      <Fl label="Internal Notes"><textarea style={ta} value={f.notes} onChange={e=>set("notes",e.target.value)} placeholder="Admin notes (not visible to customer)..."/></Fl>
+      <div style={{display:"flex",gap:10,marginTop:8}}>
+        <Btn onClick={()=>onSave(f)} full style={{padding:"10px 0"}}>Save Job</Btn>
+        <Btn onClick={onCancel} variant="ghost" full style={{padding:"10px 0"}}>Cancel</Btn>
+      </div>
+    </div>
+  );
+}
+
+// ─── JOB DETAIL ───────────────────────────────────────────────────────────────
+function JobDetail({job,onClose,onEdit,onReassign,currentUser,onEngUpdate,engineers}) {
+  const isEng = currentUser.role==="engineer";
+  const eng = engineers.find(e=>e.id===job.engineerId);
+  const [newStatus,setNewStatus]=useState(job.status);
+  const [arrived,setArrived]=useState(job.partsArrived);
+  const [note,setNote]=useState("");
+  return (
+    <div>
+      <div style={{display:"flex",gap:7,marginBottom:14,flexWrap:"wrap"}}>
+        <Badge status={job.status}/><PBadge p={job.priority}/>
+        {job.partsNeeded&&<span style={{background:C.warnLight,color:C.warn,padding:"2px 8px",borderRadius:4,fontSize:10,fontWeight:800}}>PARTS{job.partsOrdered?" · ORDERED":""}{job.partsArrived?" · ARRIVED":""}</span>}
+      </div>
+
+      {/* Appliance banner */}
+      <div style={{background:C.primaryLight,border:`1px solid #BFDBFE`,borderRadius:9,padding:"10px 16px",marginBottom:14,display:"flex",gap:24,flexWrap:"wrap",alignItems:"center"}}>
+        {[["Appliance",job.appliance],["Brand",job.brand||"Unknown"],["Age",job.applianceAge?`${job.applianceAge} yr${job.applianceAge!=1?"s":""}` :"Unknown"],["Source",job.source]].map(([l,v])=>(
+          <div key={l}><div style={{fontSize:10,color:C.light,fontWeight:700,textTransform:"uppercase"}}>{l}</div><div style={{fontWeight:700,fontSize:14,color:C.text}}>{v}</div></div>
+        ))}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+        <div style={{background:"#1E2530",borderRadius:9,padding:12}}>
+          <div style={{fontSize:10,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:5}}>Customer</div>
+          <div style={{fontWeight:700,fontSize:14}}>{job.customer}</div>
+          <div style={{color:C.mid,fontSize:12,marginTop:2}}>📞 {job.phone}</div>
+          <div style={{color:C.mid,fontSize:12}}>✉ {job.email}</div>
+        </div>
+        <div style={{background:"#1E2530",borderRadius:9,padding:12}}>
+          <div style={{fontSize:10,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:5}}>Engineer</div>
+          {eng?<><div style={{fontWeight:700,fontSize:14}}>{eng.name}</div><div style={{color:C.mid,fontSize:12,marginTop:2}}>📞 {eng.phone}</div></>
+              :<div style={{color:C.danger,fontStyle:"italic",fontSize:13}}>Not assigned</div>}
+          {!isEng&&<Btn onClick={onReassign} variant="ghost" sm style={{marginTop:8}}>⇄ Reassign Engineer</Btn>}
+        </div>
+        <div style={{background:"#1E2530",borderRadius:9,padding:12}}>
+          <div style={{fontSize:10,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:5}}>Scheduled</div>
+          <div style={{fontWeight:700}}>{fmt(job.scheduledDate)} at {job.scheduledTime}</div>
+          {job.completedDate&&<div style={{color:C.success,fontSize:12,fontWeight:600,marginTop:4}}>✓ Completed {fmt(job.completedDate)}</div>}
+        </div>
+        {!isEng&&<div style={{background:"#1E2530",borderRadius:9,padding:12}}>
+          <div style={{fontSize:10,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:5}}>Engineer Pay</div>
+          <div style={{fontWeight:900,fontSize:18,color:job.paid?C.success:C.danger}}>{job.rate?`£${job.rate}`:"—"}<span style={{fontSize:10,marginLeft:6,fontWeight:700}}>{job.paid?"✓ PAID":"UNPAID"}</span></div>
+        </div>}
+      </div>
+
+      <div style={{background:"#1E2530",borderRadius:9,padding:12,marginBottom:12}}>
+        <div style={{fontSize:10,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:4}}>Address</div>
+        <div style={{fontSize:13}}>{job.address}</div>
+        <a href={`https://maps.google.com?q=${encodeURIComponent(job.address)}`} target="_blank" rel="noreferrer" style={{fontSize:12,color:C.primary,marginTop:3,display:"inline-block"}}>Open in Maps →</a>
+      </div>
+
+      <div style={{background:"#1E2530",borderRadius:9,padding:12,marginBottom:12}}>
+        <div style={{fontSize:10,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:4}}>Fault Description</div>
+        <div style={{fontSize:13}}>{job.issue}</div>
+      </div>
+
+      {!isEng&&(
+        <div style={{background:"#1E2530",borderRadius:9,padding:12,marginBottom:12}}>
+          <div style={{fontSize:10,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Customer Notifications</div>
+          {[["📩","Booking Confirmation",job.notifBooking],["🔔","Day-Before Reminder",job.notifReminder],["🚗","Engineer On the Way",job.notifOnWay],["✅","Job Completed",job.notifComplete]].map(([ic,lb,sent])=>(
+            <div key={lb} style={{display:"flex",alignItems:"center",gap:9,padding:"6px 0",borderBottom:`1px solid ${C.border}`}}>
+              <span>{ic}</span><div style={{flex:1,fontSize:13,fontWeight:600}}>{lb}</div>
+              <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:9,background:sent?C.successLight:"#F1F5F9",color:sent?C.success:C.light}}>{sent?"SENT":"PENDING"}</span>
             </div>
           ))}
         </div>
       )}
 
-      <h2 className="text-lg font-semibold text-slate-800 mb-3">Today's schedule</h2>
-      <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-        {todaysJobs.length === 0 && <p className="p-4 text-sm text-slate-500">Nothing scheduled today.</p>}
-        {todaysJobs.map((j) => {
-          const eng = engineers.find((e) => e.id === j.engineerId);
+      {isEng&&(
+        <div style={{background:C.primaryLight,border:`1px solid #BFDBFE`,borderRadius:9,padding:14,marginBottom:12}}>
+          <div style={{fontSize:11,fontWeight:700,color:C.primary,marginBottom:9,textTransform:"uppercase"}}>Update This Job</div>
+          <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:9}}>
+            {["In Progress","Completed","Beyond Repair"].map(s=>(
+              <button key={s} onClick={()=>setNewStatus(s)} style={{padding:"6px 12px",borderRadius:7,border:`2px solid ${newStatus===s?C.primary:C.border}`,background:newStatus===s?C.primary:"#fff",color:newStatus===s?"#fff":C.mid,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>{s}</button>
+            ))}
+          </div>
+          {job.partsNeeded&&!job.partsArrived&&(
+            <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer",marginBottom:9}}>
+              <input type="checkbox" checked={arrived} onChange={e=>setArrived(e.target.checked)}/> Mark parts as arrived
+            </label>
+          )}
+          <textarea style={ta} value={note} onChange={e=>setNote(e.target.value)} placeholder="Add a note to this job..."/>
+          <Btn onClick={()=>{onEngUpdate(job.id,newStatus,arrived,note);setNote("");}} full style={{marginTop:8,padding:"9px 0"}}>Save Updates</Btn>
+        </div>
+      )}
+
+      {job.notes&&<div style={{background:"rgba(251,191,36,0.08)",borderRadius:9,padding:12,marginBottom:12,border:"1px solid rgba(251,191,36,0.25)"}}><div style={{fontSize:10,color:"#fbbf24",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>Notes</div><div style={{fontSize:13,color:"#F1F5F9",whiteSpace:"pre-wrap"}}>{job.notes}</div></div>}
+      {!isEng&&<Btn onClick={onEdit} variant="ghost" full style={{padding:"10px 0"}}>✏ Edit This Job</Btn>}
+    </div>
+  );
+}
+
+// ─── REASSIGN MODAL ───────────────────────────────────────────────────────────
+function ReassignModal({job,engineers,jobs,onReassign,onClose}) {
+  const [chosen,setChosen] = useState(job.engineerId||"");
+  const suggested = useMemo(()=>autoAssign(job,engineers,jobs),[]);
+  return (
+    <Modal title={`Reassign — Job #${job.id}: ${job.customer}`} onClose={onClose}>
+      {suggested&&<div style={{background:C.successLight,border:`1px solid #A7F3D0`,borderRadius:8,padding:"10px 14px",marginBottom:14,fontSize:13,fontWeight:600,color:C.success}}>⚡ Auto-suggestion: <strong>{suggested.name}</strong> — best match for postcode, appliance &amp; brand</div>}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
+        {engineers.map(e=>{
+          const pc=(job.postcode||"").toUpperCase(); const pcA=pc.replace(/[0-9\s]+$/,"");
+          const covers=e.postcodes.some(p=>{const up=p.toUpperCase();return pc===up||pc.startsWith(up)||pcA===up;});
+          const handles=e.applianceTypes.includes(job.appliance);
+          const excl=(e.brandExclusions[job.appliance]||[]).includes(job.brand);
+          const ok=covers&&handles&&!excl;
+          const done=jobs.filter(j=>j.engineerId===e.id&&j.status==="Completed").length;
+          const ber=jobs.filter(j=>j.engineerId===e.id&&j.status==="Beyond Repair").length;
           return (
-            <div key={j.id} className="p-4 flex items-center justify-between">
-              <div>
-                <p className="font-medium text-slate-800">{j.customerName} — {j.applianceType} ({j.brand})</p>
-                <p className="text-sm text-slate-500">{fmtDateTime(j.scheduledDate)} · {eng ? eng.name : "Unassigned"}</p>
-              </div>
-              <Pill className={STATUS_STYLES[j.status]}>{j.status.replace("_", " ")}</Pill>
+            <div key={e.id} onClick={()=>setChosen(e.id)} style={{border:`2px solid ${chosen===e.id?C.primary:C.border}`,borderRadius:9,padding:"10px 12px",cursor:"pointer",background:chosen===e.id?C.primaryLight:"#1E2530"}}>
+              <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>{e.name}</div>
+              <div style={{fontSize:11,color:C.success}}>✅ {done} repaired</div>
+              <div style={{fontSize:11,color:C.danger}}>🔴 {ber} BER</div>
+              <div style={{fontSize:11,color:C.mid}}>Success: {pct(done,done+ber)}</div>
+              {!ok&&<div style={{fontSize:10,color:C.warn,marginTop:4,fontWeight:700}}>⚠ Outside criteria</div>}
             </div>
           );
         })}
       </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Jobs                                                                 */
-/* ------------------------------------------------------------------ */
-
-function JobsView({ jobs, engineers, currentUser, onOpenJob, restrictToEngineer }) {
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [engineerFilter, setEngineerFilter] = useState("all");
-
-  const visibleJobs = jobs.filter((j) => {
-    if (restrictToEngineer && j.engineerId !== currentUser.id) return false;
-    if (statusFilter !== "all" && j.status !== statusFilter) return false;
-    if (engineerFilter !== "all" && j.engineerId !== engineerFilter) return false;
-    if (search && !`${j.customerName} ${j.postcode} ${j.applianceType}`.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
-
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">{restrictToEngineer ? "My Jobs" : "All Jobs"}</h1>
-      <div className="flex gap-3 mb-4">
-        <input className={`${inputCls} max-w-xs`} placeholder="Search customer, postcode, appliance…" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select className={`${inputCls} max-w-[160px]`} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="all">All statuses</option>
-          <option value="unassigned">Unassigned</option>
-          <option value="assigned">Assigned</option>
-          <option value="in_progress">In progress</option>
-          <option value="completed">Completed</option>
-          <option value="beyond_repair">Beyond repair</option>
+      <Fl label="Or select manually">
+        <select style={inp} value={chosen} onChange={e=>setChosen(e.target.value)}>
+          <option value="">— Unassigned —</option>
+          {engineers.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
         </select>
-        {!restrictToEngineer && (
-          <select className={`${inputCls} max-w-[180px]`} value={engineerFilter} onChange={(e) => setEngineerFilter(e.target.value)}>
-            <option value="all">All engineers</option>
-            {engineers.map((e) => (
-              <option key={e.id} value={e.id}>{e.name}</option>
-            ))}
-          </select>
-        )}
+      </Fl>
+      <div style={{display:"flex",gap:10,marginTop:10}}>
+        <Btn onClick={()=>onReassign(chosen||null)} full style={{padding:"10px 0"}}>Confirm Reassignment</Btn>
+        <Btn onClick={onClose} variant="ghost" full style={{padding:"10px 0"}}>Cancel</Btn>
       </div>
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-500 text-left">
-            <tr>
-              <th className="px-4 py-2 font-medium">Customer</th>
-              <th className="px-4 py-2 font-medium">Appliance</th>
-              <th className="px-4 py-2 font-medium">Scheduled</th>
-              <th className="px-4 py-2 font-medium">Engineer</th>
-              <th className="px-4 py-2 font-medium">Priority</th>
-              <th className="px-4 py-2 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleJobs.map((j) => {
-              const eng = engineers.find((e) => e.id === j.engineerId);
-              return (
-                <tr key={j.id} onClick={() => onOpenJob(j)} className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer">
-                  <td className="px-4 py-2.5">{j.customerName}<br /><span className="text-xs text-slate-400">{j.postcode}</span></td>
-                  <td className="px-4 py-2.5">
-                    {j.applianceType}{j.isIntegrated && <Pill className="bg-indigo-100 text-indigo-700 ml-1">Integrated</Pill>}
-                    <br /><span className="text-xs text-slate-400">{j.brand} · {j.applianceAge}</span>
-                  </td>
-                  <td className="px-4 py-2.5">{fmtDateTime(j.scheduledDate)}</td>
-                  <td className="px-4 py-2.5">{eng ? eng.name : "—"}</td>
-                  <td className="px-4 py-2.5"><Pill className={PRIORITY_STYLES[j.priority]}>{j.priority}</Pill></td>
-                  <td className="px-4 py-2.5"><Pill className={STATUS_STYLES[j.status]}>{j.status.replace("_", " ")}</Pill></td>
-                </tr>
-              );
-            })}
-            {visibleJobs.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">No jobs match.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function JobDetailModal({ job, engineers, currentUser, onClose, onUpdate, onAutoAssign }) {
-  const [notes, setNotes] = useState(job.notes.join("\n"));
-  const [showReassign, setShowReassign] = useState(false);
-  const eng = engineers.find((e) => e.id === job.engineerId);
-  const isEngineer = currentUser.role === "engineer";
-  const suggestion = findBestEngineerForJob(engineers, [], job);
-
-  function setStatus(status) {
-    onUpdate({ ...job, status, completedDate: status === "completed" ? new Date().toISOString() : job.completedDate });
-  }
-
-  function saveNotes() {
-    onUpdate({ ...job, notes: notes.split("\n").filter(Boolean) });
-  }
-
-  function toggleParts(field) {
-    onUpdate({ ...job, parts: { ...job.parts, [field]: !job.parts[field] } });
-  }
-
-  function reassign(newEngId) {
-    onUpdate({ ...job, engineerId: newEngId, status: "assigned" });
-    setShowReassign(false);
-  }
-
-  return (
-    <Modal title={`${job.customerName} — ${job.applianceType}`} onClose={onClose} wide>
-      <div className="flex gap-2 mb-4">
-        <Pill className={PRIORITY_STYLES[job.priority]}>{job.priority}</Pill>
-        <Pill className={STATUS_STYLES[job.status]}>{job.status.replace("_", " ")}</Pill>
-      </div>
-
-      <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm mb-5">
-        <p><span className="text-slate-500">Appliance:</span> {job.applianceType}, {job.brand}, {job.applianceAge}{job.isIntegrated ? ", integrated/built-in" : ""}</p>
-        <p><span className="text-slate-500">Address:</span> {job.address}</p>
-        {!isEngineer && <p><span className="text-slate-500">Phone:</span> {job.phone}</p>}
-        {!isEngineer && <p><span className="text-slate-500">Email:</span> {job.email}</p>}
-        {isEngineer && <p><span className="text-slate-500">Phone:</span> {job.phone}</p>}
-        <p><span className="text-slate-500">Scheduled:</span> {fmtDateTime(job.scheduledDate)}</p>
-        <p><span className="text-slate-500">Source:</span> {job.source}</p>
-        <p><span className="text-slate-500">Engineer:</span> {eng ? eng.name : "Unassigned"}</p>
-        {currentUser.role === "owner" && eng && <p><span className="text-slate-500">Pay rate:</span> {fmtMoney(eng.payRate)}</p>}
-      </div>
-
-      <p className="text-sm text-slate-700 mb-4"><span className="text-slate-500">Fault:</span> {job.faultDescription}</p>
-
-      {(currentUser.role === "engineer" || currentUser.role === "owner" || currentUser.role === "staff") && (
-        <div className="mb-4">
-          <p className="text-xs font-medium text-slate-500 mb-1">Parts</p>
-          <div className="flex gap-3 text-sm">
-            <label className="flex items-center gap-1.5"><input type="checkbox" checked={job.parts.needed} onChange={() => toggleParts("needed")} /> Needed</label>
-            <label className="flex items-center gap-1.5"><input type="checkbox" checked={job.parts.ordered} onChange={() => toggleParts("ordered")} /> Ordered</label>
-            <label className="flex items-center gap-1.5"><input type="checkbox" checked={job.parts.arrived} onChange={() => toggleParts("arrived")} /> Arrived</label>
-          </div>
-        </div>
-      )}
-
-      <div className="mb-4">
-        <p className="text-xs font-medium text-slate-500 mb-1">Notes</p>
-        <textarea className={inputCls} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={saveNotes} />
-      </div>
-
-      {!isEngineer && (
-        <div className="mb-4 bg-slate-50 rounded-lg p-3">
-          <p className="text-xs font-medium text-slate-500 mb-1">Customer notifications sent</p>
-          <div className="flex gap-3 text-xs">
-            {["booking", "reminder", "onway", "completed"].map((k) => (
-              <span key={k} className={job.notifications[k] ? "text-emerald-600" : "text-slate-400"}>
-                {job.notifications[k] ? "✓" : "○"} {k}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        {isEngineer ? (
-          <>
-            <button onClick={() => setStatus("in_progress")} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm font-medium">Mark In Progress</button>
-            <button onClick={() => setStatus("completed")} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium">Mark Completed</button>
-            <button onClick={() => setStatus("beyond_repair")} className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-sm font-medium">Beyond Repair</button>
-          </>
-        ) : (
-          <>
-            {job.status === "unassigned" && (
-              <button onClick={() => onAutoAssign(job)} className="px-3 py-1.5 rounded-lg bg-teal-600 text-white text-sm font-medium">⚡ Auto-Assign Best Match</button>
-            )}
-            <button onClick={() => setShowReassign(!showReassign)} className="px-3 py-1.5 rounded-lg bg-slate-200 text-slate-700 text-sm font-medium">⇄ Reassign Engineer</button>
-            {job.status === "completed" && (
-              <button onClick={() => onUpdate({ ...job, paid: !job.paid })} className="px-3 py-1.5 rounded-lg bg-slate-800 text-white text-sm font-medium">
-                {job.paid ? "Mark Unpaid" : "Mark Paid"}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {showReassign && (
-        <div className="mt-4 border border-slate-200 rounded-lg p-3">
-          <p className="text-xs font-medium text-slate-500 mb-2">Compare engineers</p>
-          {engineers.map((e) => {
-            const rate = successRate(e);
-            const eligible = postcodeMatches(e, job.postcode) && handlesAppliance(e, job.applianceType, job.brand, job.isIntegrated);
-            const isSuggested = suggestion && suggestion.id === e.id;
-            return (
-              <div key={e.id} className="flex items-center justify-between py-2 border-t border-slate-100 first:border-0">
-                <div>
-                  <p className="text-sm font-medium text-slate-800">{e.name} {isSuggested && <span className="text-teal-600 text-xs font-semibold">(suggested)</span>}</p>
-                  <p className={`text-xs ${rateColor(rate)}`}>{rate}% success rate</p>
-                  {!eligible && <p className="text-xs text-rose-500">{ineligibleReason(e, job)}</p>}
-                </div>
-                <button onClick={() => reassign(e.id)} className="px-2.5 py-1 rounded-md bg-slate-800 text-white text-xs font-medium">Assign</button>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </Modal>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Engineers                                                            */
-/* ------------------------------------------------------------------ */
-
-function EngineersView({ engineers, jobs, leads, currentUser, onEdit, onAddEngineer }) {
+// ─── ENGINEER PROFILE EDITOR ──────────────────────────────────────────────────
+function EngineerEditor({eng,user,onSave,onCancel,isOwner}) {
+  const [e,setE] = useState({...eng,brandExclusions:{...APPLIANCE_TYPES.reduce((a,t)=>({...a,[t]:[]}),{}),...eng.brandExclusions}});
+  const [u,setU] = useState({...user});
+  const [newPc,setNewPc] = useState("");
+  const setEng=(k,v)=>setE(p=>({...p,[k]:v}));
+  const setUsr=(k,v)=>setU(p=>({...p,[k]:v}));
+  const addPc=()=>{const pc=newPc.trim().toUpperCase();if(pc&&!e.postcodes.includes(pc))setEng("postcodes",[...e.postcodes,pc]);setNewPc("");};
+  const remPc=pc=>setEng("postcodes",e.postcodes.filter(x=>x!==pc));
+  const toggleApp=a=>setEng("applianceTypes",e.applianceTypes.includes(a)?e.applianceTypes.filter(x=>x!==a):[...e.applianceTypes,a]);
+  const toggleExcl=(app,brand)=>{const cur=e.brandExclusions[app]||[];setEng("brandExclusions",{...e.brandExclusions,[app]:cur.includes(brand)?cur.filter(b=>b!==brand):[...cur,brand]});};
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Engineers</h1>
-        {currentUser.role === "owner" && (
-          <button onClick={onAddEngineer} className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium">+ Add Engineer</button>
-        )}
+      <div style={{fontWeight:800,fontSize:13,color:C.mid,marginBottom:12,paddingBottom:8,borderBottom:`1px solid ${C.border}`,textTransform:"uppercase",letterSpacing:.5}}>Contact &amp; Login Details</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+        <Fl label="Full Name"><input style={inp} value={e.name} onChange={ev=>setEng("name",ev.target.value)}/></Fl>
+        <Fl label="Phone"><input style={inp} value={e.phone} onChange={ev=>setEng("phone",ev.target.value)}/></Fl>
+        <Fl label="Email / Login"><input style={inp} value={u.email} onChange={ev=>setUsr("email",ev.target.value)}/></Fl>
+        <Fl label="Password"><input style={inp} value={u.password} onChange={ev=>setUsr("password",ev.target.value)}/></Fl>
+        {isOwner&&<Fl label="Pay Rate (£ per job)"><input type="number" style={inp} value={e.rate} onChange={ev=>setEng("rate",Number(ev.target.value))}/></Fl>}
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        {engineers.map((e) => {
-          const rate = successRate(e);
-          const active = activeJobCount(jobs, e.id);
-          return (
-            <div key={e.id} className="bg-white rounded-xl border border-slate-200 p-5">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <p className="font-semibold text-slate-800">{e.name}</p>
-                  <p className="text-xs text-slate-500">{e.phone} · {e.email}</p>
+
+      <div style={{fontWeight:800,fontSize:13,color:C.mid,marginBottom:10,paddingBottom:8,borderBottom:`1px solid ${C.border}`,textTransform:"uppercase",letterSpacing:.5}}>Postcode Areas Covered</div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+        {e.postcodes.map(pc=>(
+          <span key={pc} style={{background:C.primaryLight,color:C.primary,padding:"3px 9px",borderRadius:6,fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:4}}>
+            {pc}
+            <button onClick={()=>remPc(pc)} style={{background:"none",border:"none",cursor:"pointer",color:C.primary,fontSize:14,padding:0,lineHeight:1}}>×</button>
+          </span>
+        ))}
+        {!e.postcodes.length&&<span style={{color:C.light,fontSize:12,fontStyle:"italic"}}>No areas added yet</span>}
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:20}}>
+        <input style={{...inp,maxWidth:130}} value={newPc} onChange={ev=>setNewPc(ev.target.value)} placeholder="e.g. M1 or LS" onKeyDown={ev=>ev.key==="Enter"&&addPc()}/>
+        <Btn onClick={addPc} sm>+ Add</Btn>
+      </div>
+
+      <div style={{fontWeight:800,fontSize:13,color:C.mid,marginBottom:10,paddingBottom:8,borderBottom:`1px solid ${C.border}`,textTransform:"uppercase",letterSpacing:.5}}>Appliance Types &amp; Brand Exclusions</div>
+      <div style={{fontSize:11,color:C.light,marginBottom:12}}>Tick the appliance types this engineer handles. For each active type, click any brands they <strong>won't</strong> repair (highlighted in red).</div>
+      {APPLIANCE_TYPES.map(app=>{
+        const active=e.applianceTypes.includes(app);
+        const excl=e.brandExclusions[app]||[];
+        return (
+          <div key={app} style={{marginBottom:10,background:active?"#141414":"#000000",borderRadius:9,padding:"10px 13px",border:`1.5px solid ${active?C.border:"transparent"}`}}>
+            <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:active?10:0}}>
+              <input type="checkbox" checked={active} onChange={()=>toggleApp(app)}/>
+              <span style={{fontWeight:700,fontSize:13,color:active?C.text:C.light}}>{app}</span>
+              {active&&excl.length>0&&<span style={{fontSize:10,color:C.danger,fontWeight:700}}>({excl.length} brand{excl.length>1?"s":""} excluded)</span>}
+            </label>
+            {active&&(
+              <div>
+                <div style={{fontSize:10,color:C.light,fontWeight:700,marginBottom:6,textTransform:"uppercase"}}>Won't repair — click to toggle:</div>
+                <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                  {(BRANDS[app]||[]).filter(b=>b!=="Other").map(b=>(
+                    <button key={b} onClick={()=>toggleExcl(app,b)} style={{padding:"3px 9px",borderRadius:5,border:`1.5px solid ${excl.includes(b)?C.danger:C.border}`,background:excl.includes(b)?C.dangerLight:"#fff",color:excl.includes(b)?C.danger:C.mid,fontSize:11,fontWeight:excl.includes(b)?700:400,cursor:"pointer",fontFamily:"inherit"}}>
+                      {excl.includes(b)?"✕ ":""}{b}
+                    </button>
+                  ))}
                 </div>
-                <button onClick={() => onEdit(e)} className="text-xs text-teal-600 font-medium">Edit</button>
               </div>
-              <Pill className="bg-slate-800 text-white mb-3">
-                {e.engineerType === "both" ? "Jobs & Leads" : e.engineerType === "jobs" ? "Jobs only" : "Leads only"}
-              </Pill>
-              <div className="grid grid-cols-4 gap-2 text-center mb-3">
-                <div><p className="text-lg font-bold text-slate-800">{active}</p><p className="text-xs text-slate-500">Active</p></div>
-                <div><p className="text-lg font-bold text-slate-800">{e.stats.completed}</p><p className="text-xs text-slate-500">Repaired</p></div>
-                <div><p className="text-lg font-bold text-slate-800">{e.stats.ber}</p><p className="text-xs text-slate-500">BER</p></div>
-                <div><p className={`text-lg font-bold ${rateColor(rate)}`}>{rate}%</p><p className="text-xs text-slate-500">Success</p></div>
+            )}
+          </div>
+        );
+      })}
+
+      <div style={{display:"flex",gap:10,marginTop:14}}>
+        <Btn onClick={()=>onSave(e,u)} full style={{padding:"10px 0"}}>Save All Changes</Btn>
+        <Btn onClick={onCancel} variant="ghost" full style={{padding:"10px 0"}}>Cancel</Btn>
+      </div>
+    </div>
+  );
+}
+
+// ─── USER MANAGER ─────────────────────────────────────────────────────────────
+function UserManager({users,setUsers,engineers,setEngineers}) {
+  const [editing,setEditing]=useState(null);
+  const [showAdd,setShowAdd]=useState(false);
+  const [newU,setNewU]=useState({name:"",email:"",password:"",role:"staff",phone:""});
+  const setN=(k,v)=>setNewU(p=>({...p,[k]:v}));
+
+  const addUser=()=>{
+    if(!newU.name||!newU.email||!newU.password)return;
+    const uid="u"+(++_nextUserId);
+    const av=newU.name.split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2);
+    let eid=null;
+    if(newU.role==="engineer"){
+      eid="e"+(++_nextEngId);
+      setEngineers(prev=>[...prev,{id:eid,name:newU.name,phone:newU.phone||"",email:newU.email,userId:uid,rate:45,postcodes:[],applianceTypes:[],brandExclusions:{},stats:{repairs:0,beyondRepair:0}}]);
+    }
+    setUsers(prev=>[...prev,{id:uid,...newU,avatar:av,engineerId:eid}]);
+    setNewU({name:"",email:"",password:"",role:"staff",phone:""});setShowAdd(false);
+  };
+
+  const saveEdit=(updated)=>{
+    setUsers(prev=>prev.map(u=>u.id===updated.id?updated:u));
+    setEditing(null);
+  };
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+        <h2 style={{margin:0,fontSize:18,fontWeight:900,color:C.text}}>User Accounts</h2>
+        <Btn onClick={()=>setShowAdd(true)}>+ Add User</Btn>
+      </div>
+      <div style={{background:C.card,borderRadius:13,overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,.05)"}}>
+        {users.map((u,i)=>{
+          const eng=engineers.find(e=>e.id===u.engineerId);
+          return (
+            <div key={u.id} style={{padding:"12px 18px",borderBottom:i<users.length-1?`1px solid ${C.border}`:"none",display:"flex",alignItems:"center",gap:12}}>
+              <Av initials={u.avatar} color={ROLE_C[u.role].color}/>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:13}}>{u.name}</div>
+                <div style={{color:C.light,fontSize:11}}>{u.email}{eng?` · 📞 ${eng.phone}`:""}</div>
               </div>
-              <div className="flex flex-wrap gap-1 mb-2">
-                {e.postcodes.map((p) => <Pill key={p} className="bg-slate-100 text-slate-600">{p}</Pill>)}
+              <RolePill role={u.role}/>
+              {u.role==="engineer"&&eng&&<span style={{fontSize:12,color:C.mid,fontWeight:600}}>£{eng.rate}/job</span>}
+              <Btn onClick={()=>setEditing({...u})} variant="ghost" sm>Edit</Btn>
+              {u.id!=="u1"&&<Btn onClick={()=>setUsers(prev=>prev.filter(x=>x.id!==u.id))} variant="danger" sm>Remove</Btn>}
+            </div>
+          );
+        })}
+      </div>
+
+      {editing&&(
+        <Modal title={`Edit User: ${editing.name}`} onClose={()=>setEditing(null)}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+            <Fl label="Full Name"><input style={inp} value={editing.name} onChange={e=>setEditing(p=>({...p,name:e.target.value}))}/></Fl>
+            <Fl label="Role"><select style={inp} value={editing.role} onChange={e=>setEditing(p=>({...p,role:e.target.value}))}><option value="owner">Owner</option><option value="staff">Staff</option><option value="engineer">Engineer</option></select></Fl>
+            <Fl label="Email"><input style={inp} value={editing.email} onChange={e=>setEditing(p=>({...p,email:e.target.value}))}/></Fl>
+            <Fl label="Password"><input style={inp} value={editing.password} onChange={e=>setEditing(p=>({...p,password:e.target.value}))}/></Fl>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <Btn onClick={()=>saveEdit(editing)} full style={{padding:"10px 0"}}>Save Changes</Btn>
+            <Btn onClick={()=>setEditing(null)} variant="ghost" full style={{padding:"10px 0"}}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {showAdd&&(
+        <Modal title="Add New User" onClose={()=>setShowAdd(false)}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <Fl label="Full Name"><input style={inp} value={newU.name} onChange={e=>setN("name",e.target.value)}/></Fl>
+            <Fl label="Role"><select style={inp} value={newU.role} onChange={e=>setN("role",e.target.value)}><option value="staff">Staff</option><option value="engineer">Engineer</option><option value="owner">Owner</option></select></Fl>
+            <Fl label="Email"><input style={inp} value={newU.email} onChange={e=>setN("email",e.target.value)}/></Fl>
+            <Fl label="Password"><input style={inp} value={newU.password} onChange={e=>setN("password",e.target.value)}/></Fl>
+            {newU.role==="engineer"&&<Fl label="Phone"><input style={inp} value={newU.phone} onChange={e=>setN("phone",e.target.value)} placeholder="07..."/></Fl>}
+          </div>
+          <div style={{display:"flex",gap:10,marginTop:10}}>
+            <Btn onClick={addUser} full style={{padding:"10px 0"}}>Create User</Btn>
+            <Btn onClick={()=>setShowAdd(false)} variant="ghost" full style={{padding:"10px 0"}}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+export default function App() {
+  const [currentUser,setCU]       = useState(null);
+  const [jobs,setJobs]            = useState(SEED_JOBS);
+  const [users,setUsers]          = useState(SEED_USERS);
+  const [engineers,setEngineers]  = useState(SEED_ENGINEERS);
+  const [view,setView]            = useState("dashboard");
+  const [selJob,setSelJob]        = useState(null);
+  const [editJob,setEditJob]      = useState(null);
+  const [showNew,setShowNew]      = useState(false);
+  const [reassign,setReassign]    = useState(null);
+  const [editEng,setEditEng]      = useState(null);
+  const [fsStatus,setFsStatus]    = useState("All");
+  const [fsEng,setFsEng]          = useState("All");
+  const [fsSearch,setFsSearch]    = useState("");
+
+  const isEng   = currentUser?.role==="engineer";
+  const isOwner = currentUser?.role==="owner";
+  const accent  = {owner:C.purple,staff:C.primary,engineer:C.success}[currentUser?.role]||C.primary;
+
+  const visJobs  = isEng ? jobs.filter(j=>j.engineerId===currentUser.engineerId) : jobs;
+  const filtJobs = visJobs.filter(j=>{
+    if(fsStatus!=="All"&&j.status!==fsStatus)return false;
+    if(fsEng!=="All"&&j.engineerId!==fsEng)return false;
+    if(fsSearch&&![j.customer,j.address,String(j.id),j.appliance,j.brand||"",j.postcode||""].some(s=>s.toLowerCase().includes(fsSearch.toLowerCase())))return false;
+    return true;
+  });
+
+  const todayJobs  = visJobs.filter(j=>j.scheduledDate===TODAY);
+  const unassigned = jobs.filter(j=>!j.engineerId&&!["Cancelled","Completed","Beyond Repair"].includes(j.status));
+  const unpaidDone = jobs.filter(j=>j.status==="Completed"&&!j.paid);
+  const unpaidAmt  = unpaidDone.reduce((s,j)=>s+Number(j.rate||0),0);
+
+  const saveJob=(form)=>{
+    if(editJob){setJobs(js=>js.map(j=>j.id===editJob.id?{...j,...form,rate:isOwner?form.rate:j.rate}:j));}
+    else{setJobs(js=>[...js,{...form,id:_nextJobId++,notifBooking:true,notifReminder:false,notifOnWay:false,notifComplete:false}]);}
+    setEditJob(null);setShowNew(false);setSelJob(null);
+  };
+
+  const engUpdate=(jobId,status,partsArrived,note)=>{
+    const targetJob = jobs.find(j=>j.id===jobId);
+    setJobs(js=>js.map(j=>j.id!==jobId?j:{...j,status,partsArrived:partsArrived??j.partsArrived,completedDate:["Completed","Beyond Repair"].includes(status)?TODAY:j.completedDate,notes:note?(j.notes?j.notes+"\n"+note:note):j.notes,notifComplete:status==="Completed"?true:j.notifComplete}));
+    if(["Completed","Beyond Repair"].includes(status)&&targetJob){
+      setEngineers(es=>es.map(e=>e.id!==targetJob.engineerId?e:{...e,stats:{repairs:e.stats.repairs+(status==="Completed"?1:0),beyondRepair:e.stats.beyondRepair+(status==="Beyond Repair"?1:0)}}));
+    }
+    setSelJob(null);
+  };
+
+  const doReassign=(engId)=>{
+    const eng=engineers.find(e=>e.id===engId);
+    setJobs(js=>js.map(j=>j.id!==reassign.id?j:{...j,engineerId:engId||null,status:engId?"Assigned":"Booked",rate:eng?eng.rate:j.rate}));
+    setReassign(null);setSelJob(null);
+  };
+
+  const saveEng=(engData,userData)=>{
+    setEngineers(es=>es.map(e=>e.id===engData.id?engData:e));
+    setUsers(us=>us.map(u=>u.id===userData.id?{...u,...userData}:u));
+    setEditEng(null);
+  };
+
+  const NAV = isEng
+    ? [{id:"dashboard",label:"My Jobs",ic:"📋"},{id:"payments",label:"My Pay",ic:"£"}]
+    : [{id:"dashboard",label:"Dashboard",ic:"⊞"},{id:"jobs",label:"All Jobs",ic:"📋"},{id:"engineers",label:"Engineers",ic:"🔧"},{id:"payments",label:"Payments",ic:"£"},...(isOwner?[{id:"users",label:"Users",ic:"👤"}]:[])];
+
+  if(!currentUser) return <Login onLogin={u=>{setCU(u);setView("dashboard");}}/>;
+
+  return (
+    <div style={{fontFamily:"'Inter','Segoe UI',sans-serif",background:"#000000",minHeight:"100vh",display:"flex"}}>
+      {/* Sidebar */}
+      <div style={{width:208,background:C.sidebar,display:"flex",flexDirection:"column",height:"100vh",position:"sticky",top:0,flexShrink:0}}>
+        <div style={{padding:"18px 15px 14px",display:"flex",alignItems:"center",borderBottom:"1px solid #141414"}}>
+          <img src="/logo.png" alt="Easy Repair" style={{height:22,display:"block"}}/>
+        </div>
+        <nav style={{flex:1,padding:"6px 10px"}}>
+          {NAV.map(n=>(
+            <button key={n.id} onClick={()=>setView(n.id)} style={{width:"100%",textAlign:"left",background:view===n.id?"rgba(212,255,60,0.08)":"none",color:view===n.id?"#d4ff3c":"#475569",border:"none",borderLeft:`3px solid ${view===n.id?"#d4ff3c":"transparent"}`,borderRadius:"0 7px 7px 0",padding:"9px 11px",cursor:"pointer",fontSize:13,fontWeight:view===n.id?700:500,display:"flex",alignItems:"center",gap:9,marginBottom:1,fontFamily:"inherit"}}>
+              <span>{n.ic}</span>{n.label}
+            </button>
+          ))}
+        </nav>
+        <div style={{padding:"12px 13px",borderTop:"1px solid #1F2937",display:"flex",alignItems:"center",gap:9}}>
+          <Av initials={currentUser.avatar} size={30} color={accent}/>
+          <div style={{flex:1,overflow:"hidden"}}><div style={{color:"#E5E7EB",fontSize:12,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{currentUser.name}</div><RolePill role={currentUser.role}/></div>
+          <button onClick={()=>{setCU(null);setView("dashboard");}} style={{background:"none",border:"none",color:"#6B7280",cursor:"pointer",fontSize:17,padding:0}} title="Sign out">⏻</button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{flex:1,overflowY:"auto",padding:"22px 24px"}}>
+        <div style={{maxWidth:1080}}>
+
+          {/* ── DASHBOARD ── */}
+          {view==="dashboard"&&(
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+                <div><h1 style={{margin:0,fontSize:20,fontWeight:900,color:C.text}}>{isEng?`Hi ${currentUser.name.split(" ")[0]} 👋`:"Dashboard"}</h1><div style={{color:C.light,fontSize:12,marginTop:1}}>Saturday 6 June 2026</div></div>
+                {!isEng&&<Btn onClick={()=>{setEditJob(null);setShowNew(true);}}>+ New Booking</Btn>}
               </div>
-              <div className="flex flex-wrap gap-1 mb-3">
-                {e.applianceTypes.map((a) => <Pill key={a} className="bg-blue-50 text-blue-700">{a}</Pill>)}
+              <div style={{display:"flex",gap:12,marginBottom:18,flexWrap:"wrap"}}>
+                <StatCard label="Today's Jobs" value={todayJobs.length} color={C.primary} sub={`${todayJobs.filter(j=>j.status==="Completed").length} done`}/>
+                {!isEng&&<StatCard label="Unassigned" value={unassigned.length} color={C.warn} sub="Need engineer"/>}
+                <StatCard label={isEng?"Active":"Active Jobs"} value={visJobs.filter(j=>!["Cancelled","Completed","Beyond Repair"].includes(j.status)).length} color={C.purple}/>
+                {isOwner&&<StatCard label="Outstanding Pay" value={`£${unpaidAmt}`} color={C.danger} sub={`${unpaidDone.length} unpaid`}/>}
               </div>
-              {e.engineerType !== "jobs" && (
-                <div className="flex items-center justify-between text-xs bg-violet-50 rounded-lg px-3 py-2">
-                  <span className="text-violet-700 font-medium">Leads: {e.leadPrefs.active ? "Active" : "Paused"}</span>
-                  <span className="text-violet-700">{leadsAssignedToday(leads, e.id)}/{e.leadPrefs.dailyLeadTarget} today · {fmtMoney(e.leadPrefs.pricePerLead)}/lead</span>
+              <div style={{background:C.card,borderRadius:12,boxShadow:"0 1px 3px rgba(0,0,0,.05)",overflow:"hidden",marginBottom:14}}>
+                <div style={{padding:"11px 17px",borderBottom:`1px solid ${C.border}`,fontWeight:800,color:C.text,fontSize:13}}>Today's Schedule</div>
+                {todayJobs.length===0?<div style={{padding:22,textAlign:"center",color:C.light,fontSize:13}}>No jobs scheduled today</div>:todayJobs.map(j=>{
+                  const eng=engineers.find(e=>e.id===j.engineerId);
+                  return <div key={j.id} onClick={()=>setSelJob(j)} style={{padding:"10px 17px",borderBottom:`1px solid #262626`,cursor:"pointer",display:"flex",alignItems:"center",gap:12}} onMouseOver={e=>e.currentTarget.style.background="#1E2530"} onMouseOut={e=>e.currentTarget.style.background="transparent"}>
+                    <div style={{fontWeight:800,color:C.primary,fontSize:12,minWidth:42}}>{j.scheduledTime}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:13}}>{j.customer} <span style={{color:C.light,fontWeight:400}}>· {j.appliance} · {j.brand||"?"}{j.applianceAge?` · ${j.applianceAge}yr`:""}</span></div>
+                      <div style={{color:C.mid,fontSize:11}}>{j.address}</div>
+                    </div>
+                    {!isEng&&<div style={{fontSize:11,color:C.mid}}>{eng?.name||<span style={{color:C.danger,fontWeight:700}}>Unassigned</span>}</div>}
+                    <Badge status={j.status}/><PBadge p={j.priority}/>
+                  </div>;
+                })}
+              </div>
+              {!isEng&&unassigned.length>0&&(
+                <div style={{background:C.warnLight,border:`1px solid #FDE68A`,borderRadius:11,padding:"12px 16px"}}>
+                  <div style={{fontWeight:700,color:"#fbbf24",marginBottom:9,fontSize:12}}>⚠ {unassigned.length} job{unassigned.length>1?"s":""} awaiting engineer assignment</div>
+                  {unassigned.map(j=>(
+                    <div key={j.id} onClick={()=>setSelJob(j)} style={{background:"#141414",borderRadius:7,padding:"8px 12px",marginBottom:6,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{fontSize:13}}><strong>{j.customer}</strong> · {j.appliance} · {j.brand||"?"} · {fmt(j.scheduledDate)}</span><PBadge p={j.priority}/>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function EngineerEditModal({ engineer, currentUser, onClose, onSave, isNew }) {
-  const [form, setForm] = useState(JSON.parse(JSON.stringify(engineer)));
-  const canSave = form.name.trim() && form.email.trim() && form.password.trim() && form.postcodes.length > 0 && form.applianceTypes.length > 0;
-
-  function toggleApplianceType(type) {
-    setForm((f) => {
-      const has = f.applianceTypes.includes(type);
-      return {
-        ...f,
-        applianceTypes: has ? f.applianceTypes.filter((t) => t !== type) : [...f.applianceTypes, type],
-      };
-    });
-  }
-
-  function toggleBrandExclusion(type, brand) {
-    setForm((f) => {
-      const current = f.brandExclusions[type] || [];
-      const updated = current.includes(brand) ? current.filter((b) => b !== brand) : [...current, brand];
-      return { ...f, brandExclusions: { ...f.brandExclusions, [type]: updated } };
-    });
-  }
-
-  function toggleIntegratedExclusion(type) {
-    setForm((f) => {
-      const current = f.integratedExclusions || [];
-      const updated = current.includes(type) ? current.filter((t) => t !== type) : [...current, type];
-      return { ...f, integratedExclusions: updated };
-    });
-  }
-
-  function addPostcode(val) {
-    if (!val) return;
-    setForm((f) => ({ ...f, postcodes: [...f.postcodes, val.toUpperCase()] }));
-  }
-
-  function removePostcode(p) {
-    setForm((f) => ({ ...f, postcodes: f.postcodes.filter((x) => x !== p) }));
-  }
-
-  const [pcInput, setPcInput] = useState("");
-
-  const footerContent = (
-    <div className="flex items-center justify-end gap-3">
-      {!canSave && (
-        <p className="text-xs text-rose-500 mr-auto">
-          Still needed: {[
-            !form.name.trim() && "name",
-            !form.email.trim() && "email",
-            !form.password.trim() && "password",
-            form.postcodes.length === 0 && "a postcode area",
-            form.applianceTypes.length === 0 && "an appliance type",
-          ].filter(Boolean).join(", ")}
-        </p>
-      )}
-      <button onClick={onClose} className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium">Cancel</button>
-      <button
-        onClick={() => { if (canSave) onSave(form); }}
-        className="px-4 py-2 rounded-lg text-sm font-medium bg-teal-600 text-white hover:bg-teal-700"
-      >
-        {isNew ? "Add Engineer" : "Save changes"}
-      </button>
-    </div>
-  );
-
-  return (
-    <Modal title={isNew ? "Add New Engineer" : `Edit ${engineer.name}`} onClose={onClose} wide footer={footerContent}>
-      <div className="mb-5">
-        <p className="text-sm font-semibold text-slate-700 mb-2">Works on</p>
-        <select
-          className={inputCls}
-          value={form.engineerType}
-          onChange={(e) => setForm({ ...form, engineerType: e.target.value })}
-        >
-          <option value="both">Jobs & Leads</option>
-          <option value="jobs">Jobs only</option>
-          <option value="leads">Leads only</option>
-        </select>
-        <p className="text-xs text-slate-500 mt-1">
-          Controls whether this engineer is included in job auto-assign, lead auto-assign, or both.
-        </p>
-      </div>
-      <div className="grid grid-cols-2 gap-6">
-        <div>
-          <p className="text-sm font-semibold text-slate-700 mb-2">Contact & login details</p>
-          <Field label="Name"><input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-          <Field label="Phone"><input className={inputCls} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
-          <Field label="Email"><input className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-          <Field label="Password"><input className={inputCls} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
-          {currentUser.role === "owner" && form.engineerType !== "leads" && (
-            <Field label="Pay rate per job (£)">
-              <input className={inputCls} type="number" value={form.payRate} onChange={(e) => setForm({ ...form, payRate: Number(e.target.value) })} />
-            </Field>
           )}
 
-          <p className="text-sm font-semibold text-slate-700 mt-5 mb-2">Postcode areas covered</p>
-          <div className="flex flex-wrap gap-1 mb-2">
-            {form.postcodes.map((p) => (
-              <Pill key={p} className="bg-slate-100 text-slate-700">
-                {p} <button onClick={() => removePostcode(p)} className="ml-1 text-slate-400 hover:text-rose-600">×</button>
-              </Pill>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input className={inputCls} placeholder="e.g. M1" value={pcInput} onChange={(e) => setPcInput(e.target.value)} />
-            <button onClick={() => { addPostcode(pcInput); setPcInput(""); }} className="px-3 py-2 bg-slate-800 text-white rounded-lg text-sm">Add</button>
-          </div>
-        </div>
-
-        <div>
-          <p className="text-sm font-semibold text-slate-700 mb-1">Appliance types & brand exclusions</p>
-          <p className="text-xs text-slate-500 mb-2">Tick an appliance type below, then brand and integrated-unit options will appear underneath it — click a brand to mark it as one they won't repair, or tick the integrated box if they don't do built-in units for that type.</p>
-          <div className="space-y-2 mb-5">
-            {APPLIANCE_TYPES.map((type) => {
-              const active = form.applianceTypes.includes(type);
-              const avoidsIntegrated = (form.integratedExclusions || []).includes(type);
-              return (
-                <div key={type} className="border border-slate-200 rounded-lg p-2.5">
-                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <input type="checkbox" checked={active} onChange={() => toggleApplianceType(type)} /> {type}
-                  </label>
-                  {active ? (
-                    <>
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {BRANDS.map((b) => {
-                          const excluded = (form.brandExclusions[type] || []).includes(b);
-                          return (
-                            <button
-                              key={b}
-                              onClick={() => toggleBrandExclusion(type, b)}
-                              className={`text-xs px-2 py-1 rounded-md ${excluded ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}
-                            >
-                              {b}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <label className="flex items-center gap-2 text-xs text-slate-600 mt-2">
-                        <input type="checkbox" checked={avoidsIntegrated} onChange={() => toggleIntegratedExclusion(type)} />
-                        Won't work on integrated / built-in {type.toLowerCase()} units
-                      </label>
-                    </>
-                  ) : (
-                    <p className="text-xs text-slate-400 mt-1 ml-6">Tick to set brand and integrated-unit exclusions for this type</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {form.engineerType !== "jobs" && (
-            <>
-              <p className="text-sm font-semibold text-violet-700 mb-2">Lead marketplace preferences</p>
-              <div className="bg-violet-50 rounded-lg p-3 space-y-3">
-                <label className="flex items-center gap-2 text-sm font-medium text-violet-800">
-                  <input
-                    type="checkbox"
-                    checked={form.leadPrefs.active}
-                    onChange={(e) => setForm({ ...form, leadPrefs: { ...form.leadPrefs, active: e.target.checked } })}
-                  />
-                  Currently in the lead pool
-                </label>
-                <Field label={`How many leads they'd like per day: ${form.leadPrefs.dailyLeadTarget}/day`}>
-                  <input
-                    type="range"
-                    min={0}
-                    max={30}
-                    step={1}
-                    value={form.leadPrefs.dailyLeadTarget}
-                    onChange={(e) => setForm({ ...form, leadPrefs: { ...form.leadPrefs, dailyLeadTarget: Number(e.target.value) } })}
-                    className="w-full accent-violet-600"
-                  />
-                </Field>
-                <Field label="Price they pay per lead (£)">
-                  <input
-                    className={inputCls}
-                    type="number"
-                    min={0}
-                    value={form.leadPrefs.pricePerLead}
-                    onChange={(e) => setForm({ ...form, leadPrefs: { ...form.leadPrefs, pricePerLead: Number(e.target.value) } })}
-                  />
-                </Field>
-                <p className="text-xs text-violet-600">
-                  Leads are assigned automatically up to this daily amount, split fairly across everyone in the area who repairs this
-                  appliance type — no accept/decline needed. Card on file: {form.leadPrefs.cardLast4 ? `•••• ${form.leadPrefs.cardLast4}` : "None saved"}, charged automatically at end of day.
-                </p>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Lead Engineers (marketplace)                                        */
-/* ------------------------------------------------------------------ */
-
-function NewLeadForm({ onCreate, onCancel }) {
-  const [form, setForm] = useState({
-    customerName: "",
-    phone: "",
-    address: "",
-    postcode: "",
-    applianceType: APPLIANCE_TYPES[0],
-    brand: BRANDS[0],
-    applianceAge: "",
-    isIntegrated: false,
-    priority: "normal",
-    description: "",
-    source: "",
-  });
-
-  return (
-    <Modal title="New Lead" onClose={onCancel}>
-      <Field label="Customer name"><input className={inputCls} value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} /></Field>
-      <Field label="Phone"><input className={inputCls} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
-      <Field label="Address"><input className={inputCls} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
-      <Field label="Postcode"><input className={inputCls} value={form.postcode} onChange={(e) => setForm({ ...form, postcode: e.target.value })} /></Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Appliance type">
-          <select className={inputCls} value={form.applianceType} onChange={(e) => setForm({ ...form, applianceType: e.target.value })}>
-            {APPLIANCE_TYPES.map((t) => <option key={t}>{t}</option>)}
-          </select>
-        </Field>
-        <Field label="Brand">
-          <select className={inputCls} value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })}>
-            {BRANDS.map((b) => <option key={b}>{b}</option>)}
-          </select>
-        </Field>
-      </div>
-      <Field label="Appliance age"><input className={inputCls} placeholder="e.g. 4 years" value={form.applianceAge} onChange={(e) => setForm({ ...form, applianceAge: e.target.value })} /></Field>
-      <label className="flex items-center gap-2 text-sm text-slate-700 mb-3">
-        <input type="checkbox" checked={form.isIntegrated} onChange={(e) => setForm({ ...form, isIntegrated: e.target.checked })} />
-        Integrated / built-in unit
-      </label>
-      <Field label="Priority">
-        <select className={inputCls} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
-          <option value="normal">Normal</option>
-          <option value="high">High</option>
-          <option value="urgent">Urgent</option>
-        </select>
-      </Field>
-      <Field label="Description"><textarea className={inputCls} rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
-      <Field label="Source website"><input className={inputCls} value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} /></Field>
-      <div className="flex justify-end gap-2 mt-2">
-        <button onClick={onCancel} className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium">Cancel</button>
-        <button onClick={() => onCreate(form)} className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium">Create & auto-assign</button>
-      </div>
-    </Modal>
-  );
-}
-
-function LeadsView({ leads, engineers, onCreateLead, onAutoAssign }) {
-  const [showNew, setShowNew] = useState(false);
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Lead Engineers</h1>
-        <button onClick={() => setShowNew(true)} className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium">+ New Lead</button>
-      </div>
-      <p className="text-sm text-slate-500 mb-5">
-        Leads come in from the booking form the same way jobs do. Each one is auto-assigned within its area's pool — every engineer
-        whose postcode coverage matches and who repairs that appliance type/brand — and handed to whoever is furthest below their
-        own daily target, so everyone's requested number fills evenly. No accept/decline; it's simply assigned.
-      </p>
-
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        {engineers.map((e) => (
-          <div key={e.id} className="bg-white rounded-xl border border-slate-200 p-4">
-            <p className="font-medium text-slate-800 text-sm">{e.name}</p>
-            <p className="text-xs text-slate-500 mb-2">{e.leadPrefs.active ? "In the pool" : "Paused"} · covers {e.postcodes.join(", ")}</p>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-violet-700 font-semibold">{leadsAssignedToday(leads, e.id)}/{e.leadPrefs.dailyLeadTarget} today</span>
-              <span className="text-slate-500">{fmtMoney(e.leadPrefs.pricePerLead)}/lead</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-500 text-left">
-            <tr>
-              <th className="px-4 py-2 font-medium">Customer</th>
-              <th className="px-4 py-2 font-medium">Appliance</th>
-              <th className="px-4 py-2 font-medium">Priority</th>
-              <th className="px-4 py-2 font-medium">Engineer</th>
-              <th className="px-4 py-2 font-medium">Price</th>
-              <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-4 py-2 font-medium">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {leads.map((l) => {
-              const eng = engineers.find((e) => e.id === l.engineerId);
-              return (
-                <tr key={l.id} className="border-t border-slate-100">
-                  <td className="px-4 py-2.5">{l.customerName}<br /><span className="text-xs text-slate-400">{l.postcode}</span></td>
-                  <td className="px-4 py-2.5">
-                    {l.applianceType}{l.isIntegrated && <Pill className="bg-indigo-100 text-indigo-700 ml-1">Integrated</Pill>}
-                    <br /><span className="text-xs text-slate-400">{l.brand} · {l.applianceAge || "—"}</span>
-                  </td>
-                  <td className="px-4 py-2.5"><Pill className={PRIORITY_STYLES[l.priority]}>{l.priority}</Pill></td>
-                  <td className="px-4 py-2.5">{eng ? eng.name : "—"}</td>
-                  <td className="px-4 py-2.5">{l.price ? fmtMoney(l.price) : "—"}</td>
-                  <td className="px-4 py-2.5"><Pill className={LEAD_STATUS_STYLES[l.status]}>{l.status}</Pill></td>
-                  <td className="px-4 py-2.5">
-                    {l.status === "unassigned" && (
-                      <button onClick={() => onAutoAssign(l)} className="text-xs text-violet-600 font-medium">⚡ Auto-assign</button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {showNew && (
-        <NewLeadForm
-          onCancel={() => setShowNew(false)}
-          onCreate={(form) => {
-            onCreateLead(form);
-            setShowNew(false);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-function MyLeadsView({ leads, currentUser, onUpdateTarget }) {
-  const mine = leads.filter((l) => l.engineerId === currentUser.id);
-  const todayCount = leadsAssignedToday(leads, currentUser.id);
-  const todaysLeads = mine.filter((l) => l.assignedAt && l.assignedAt.startsWith(todayStr()));
-  const owedToday = todaysLeads.reduce((sum, l) => sum + (l.price || 0), 0);
-
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-4">My Leads</h1>
-      <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6 flex gap-8">
-        <div>
-          <p className="text-xs text-violet-600">Leads today</p>
-          <p className="text-xl font-bold text-violet-800">{todayCount} / {currentUser.leadPrefs.dailyLeadTarget}</p>
-        </div>
-        <div>
-          <p className="text-xs text-violet-600">Estimated charge tonight</p>
-          <p className="text-xl font-bold text-violet-800">{fmtMoney(owedToday)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-violet-600">Card on file</p>
-          <p className="text-xl font-bold text-violet-800">{currentUser.leadPrefs.cardLast4 ? `•••• ${currentUser.leadPrefs.cardLast4}` : "None"}</p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
-        <p className="text-sm font-semibold text-slate-700 mb-1">How many leads would you like per day?</p>
-        <p className="text-xs text-slate-500 mb-4">
-          We'll assign you up to this many leads a day, matched to your area and the appliances you repair, at {fmtMoney(currentUser.leadPrefs.pricePerLead)} each.
-        </p>
-        <div className="flex items-center gap-4">
-          <input
-            type="range"
-            min={0}
-            max={30}
-            step={1}
-            value={currentUser.leadPrefs.dailyLeadTarget}
-            onChange={(e) => onUpdateTarget(Number(e.target.value))}
-            className="flex-1 accent-violet-600"
-          />
-          <span className="w-24 text-right text-2xl font-bold text-violet-700">{currentUser.leadPrefs.dailyLeadTarget}/day</span>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-        {mine.length === 0 && <p className="p-4 text-sm text-slate-500">No leads assigned yet.</p>}
-        {mine.map((l) => (
-          <div key={l.id} className="p-4">
-            <div className="flex items-start justify-between mb-2">
-              <p className="font-medium text-slate-800">{l.customerName}</p>
-              <Pill className={LEAD_STATUS_STYLES[l.status]}>{l.status}</Pill>
-            </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 mb-2">
-              <p><span className="text-slate-500">Phone:</span> {l.phone}</p>
-              <p><span className="text-slate-500">Address:</span> {l.address} ({l.postcode})</p>
-              <p><span className="text-slate-500">Appliance:</span> {l.applianceType}{l.isIntegrated ? " (Integrated/built-in)" : ""}</p>
-              <p><span className="text-slate-500">Brand:</span> {l.brand}</p>
-              <p><span className="text-slate-500">Age:</span> {l.applianceAge || "Not given"}</p>
-              <p><span className="text-slate-500">Priority:</span> {l.priority}</p>
-            </div>
-            <p className="text-sm text-slate-600 mb-2">{l.description}</p>
-            <p className="text-xs text-slate-400">Price: {fmtMoney(l.price)}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Payments & Billing                                                   */
-/* ------------------------------------------------------------------ */
-
-function PaymentsView({ jobs, leads, engineers, currentUser, onMarkPaid, billingRuns, onRunBilling }) {
-  const [tab, setTab] = useState("jobs");
-  const unpaidJobs = jobs.filter((j) => j.status === "completed" && !j.paid);
-
-  const today = todayStr();
-  const dueToday = engineers
-    .map((e) => {
-      const count = leads.filter((l) => l.engineerId === e.id && l.status === "assigned" && l.assignedAt?.startsWith(today) && !l.billed).length;
-      return { engineer: e, count, total: count * e.leadPrefs.pricePerLead };
-    })
-    .filter((d) => d.count > 0);
-
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">Payments & Billing</h1>
-      <div className="flex gap-2 mb-5">
-        <button onClick={() => setTab("jobs")} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${tab === "jobs" ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>Job payments</button>
-        <button onClick={() => setTab("leads")} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${tab === "leads" ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600"}`}>Lead billing</button>
-      </div>
-
-      {tab === "jobs" && (
-        <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-          {unpaidJobs.length === 0 && <p className="p-4 text-sm text-slate-500">No outstanding engineer payments.</p>}
-          {unpaidJobs.map((j) => {
-            const eng = engineers.find((e) => e.id === j.engineerId);
-            return (
-              <div key={j.id} className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-slate-800">{eng?.name} — {j.customerName}</p>
-                  <p className="text-sm text-slate-500">Completed {fmtDateTime(j.completedDate)}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-slate-800">{fmtMoney(eng?.payRate)}</span>
-                  <button onClick={() => onMarkPaid(j)} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium">Mark Paid</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {tab === "leads" && (
-        <>
-          <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-4">
-            <p className="text-sm text-violet-800">
-              Engineers pay per lead assigned to them. At the end of each day the system charges each engineer's card on file for the
-              leads they received. This demo simulates that charge — connecting a real processor (e.g. Stripe) is needed to actually collect payment live.
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 mb-4">
-            {dueToday.length === 0 && <p className="p-4 text-sm text-slate-500">No leads awaiting billing today.</p>}
-            {dueToday.map(({ engineer, count, total }) => (
-              <div key={engineer.id} className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-slate-800">{engineer.name}</p>
-                  <p className="text-sm text-slate-500">{count} lead{count !== 1 ? "s" : ""} × {fmtMoney(engineer.leadPrefs.pricePerLead)}</p>
-                </div>
-                <span className="font-semibold text-slate-800">{fmtMoney(total)}</span>
-              </div>
-            ))}
-          </div>
-          {currentUser.role !== "engineer" && dueToday.length > 0 && (
-            <button onClick={onRunBilling} className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium mb-6">
-              Run end-of-day billing now ({fmtMoney(dueToday.reduce((s, d) => s + d.total, 0))} total)
-            </button>
-          )}
-
-          <h2 className="text-lg font-semibold text-slate-800 mb-3">Billing history</h2>
-          <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-            {billingRuns.length === 0 && <p className="p-4 text-sm text-slate-500">No billing runs yet.</p>}
-            {billingRuns.map((run) => (
-              <div key={run.id} className="p-4">
-                <p className="text-sm font-medium text-slate-800">{fmtDateTime(run.timestamp)} — {fmtMoney(run.total)} charged</p>
-                {run.entries.map((en) => (
-                  <p key={en.engineerId} className="text-xs text-slate-500 ml-2">
-                    {en.engineerName}: {en.count} lead{en.count !== 1 ? "s" : ""} — {fmtMoney(en.total)} ✓ charged {en.cardLast4 ? `•••• ${en.cardLast4}` : ""}
-                  </p>
-                ))}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Users                                                                */
-/* ------------------------------------------------------------------ */
-
-function UsersView({ users, onEditUser, onAddUser }) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">User Accounts</h1>
-        <button onClick={onAddUser} className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium">+ Add User</button>
-      </div>
-      <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-        {users.map((u) => (
-          <div key={u.id} className="p-4 flex items-center justify-between">
+          {/* ── ALL JOBS ── */}
+          {view==="jobs"&&!isEng&&(
             <div>
-              <p className="font-medium text-slate-800">{u.name}</p>
-              <p className="text-sm text-slate-500">{u.email} · <span className="capitalize">{u.role}</span></p>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:15}}>
+                <h1 style={{margin:0,fontSize:19,fontWeight:900,color:C.text}}>All Jobs</h1>
+                <Btn onClick={()=>{setEditJob(null);setShowNew(true);}}>+ New Booking</Btn>
+              </div>
+              <div style={{display:"flex",gap:9,marginBottom:12,flexWrap:"wrap"}}>
+                <input style={{...inp,maxWidth:210}} placeholder="Name / address / brand / #ID" value={fsSearch} onChange={e=>setFsSearch(e.target.value)}/>
+                <select style={{...inp,maxWidth:155}} value={fsStatus} onChange={e=>setFsStatus(e.target.value)}><option value="All">All Statuses</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>
+                <select style={{...inp,maxWidth:165}} value={fsEng} onChange={e=>setFsEng(e.target.value)}><option value="All">All Engineers</option>{engineers.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select>
+              </div>
+              <div style={{background:C.card,borderRadius:12,boxShadow:"0 1px 3px rgba(0,0,0,.05)",overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",minWidth:860}}>
+                  <thead><tr style={{background:"#161B22"}}>
+                    {["#","Customer","Appliance","Brand","Age","Scheduled","Engineer","Status","Pay"].map(h=>(
+                      <th key={h} style={{padding:"9px 13px",textAlign:"left",fontSize:10,fontWeight:700,color:C.light,textTransform:"uppercase",letterSpacing:.5,borderBottom:`1px solid ${C.border}`}}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {filtJobs.length===0?<tr><td colSpan={9} style={{padding:28,textAlign:"center",color:C.light}}>No jobs found</td></tr>:filtJobs.map(j=>{
+                      const eng=engineers.find(e=>e.id===j.engineerId);
+                      return <tr key={j.id} onClick={()=>setSelJob(j)} style={{cursor:"pointer",borderBottom:`1px solid #262626`}} onMouseOver={e=>e.currentTarget.style.background="#1E2530"} onMouseOut={e=>e.currentTarget.style.background="transparent"}>
+                        <td style={{padding:"9px 13px",fontSize:12,color:C.primary,fontWeight:800}}>#{j.id}</td>
+                        <td style={{padding:"9px 13px"}}><div style={{fontWeight:700,fontSize:13}}>{j.customer}</div><div style={{color:C.light,fontSize:10}}>{j.source}</div></td>
+                        <td style={{padding:"9px 13px",fontSize:12}}>{j.appliance}</td>
+                        <td style={{padding:"9px 13px",fontSize:12,fontWeight:600}}>{j.brand||<span style={{color:C.light}}>—</span>}</td>
+                        <td style={{padding:"9px 13px",fontSize:12}}>{j.applianceAge?`${j.applianceAge}yr`:<span style={{color:C.light}}>—</span>}</td>
+                        <td style={{padding:"9px 13px",fontSize:11}}>{fmt(j.scheduledDate)}<br/><span style={{color:C.light}}>{j.scheduledTime}</span></td>
+                        <td style={{padding:"9px 13px",fontSize:12,color:eng?C.text:C.danger,fontWeight:eng?400:700}}>{eng?.name||"Unassigned"}</td>
+                        <td style={{padding:"9px 13px"}}><Badge status={j.status}/></td>
+                        <td style={{padding:"9px 13px",fontSize:12,fontWeight:800,color:j.paid?C.success:j.rate?C.danger:C.light}}>{j.rate?`£${j.rate}`:"—"}{j.paid?" ✓":""}</td>
+                      </tr>;
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <button onClick={() => onEditUser(u)} className="text-sm text-teal-600 font-medium">Edit</button>
-          </div>
-        ))}
+          )}
+
+          {/* ── ENGINEERS ── */}
+          {view==="engineers"&&!isEng&&(
+            <div>
+              <h1 style={{margin:"0 0 16px",fontSize:19,fontWeight:900,color:C.text}}>Engineers</h1>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(330px,1fr))",gap:14}}>
+                {engineers.map(eng=>{
+                  const eJobs=jobs.filter(j=>j.engineerId===eng.id);
+                  const done=eJobs.filter(j=>j.status==="Completed").length;
+                  const ber=eJobs.filter(j=>j.status==="Beyond Repair").length;
+                  const total=done+ber;
+                  const sr=total?Math.round(done/total*100):null;
+                  const active=eJobs.filter(j=>!["Completed","Beyond Repair","Cancelled"].includes(j.status)).length;
+                  const owed=eJobs.filter(j=>j.status==="Completed"&&!j.paid).reduce((s,j)=>s+Number(j.rate||0),0);
+                  const engUser=users.find(u=>u.engineerId===eng.id);
+                  return (
+                    <div key={eng.id} style={{background:C.card,borderRadius:13,boxShadow:"0 1px 3px rgba(0,0,0,.05)",overflow:"hidden"}}>
+                      <div style={{padding:"13px 15px",borderBottom:`1px solid ${C.border}`,display:"flex",gap:10,alignItems:"center"}}>
+                        <Av initials={eng.name.split(" ").map(w=>w[0]).join("")} color={accent}/>
+                        <div style={{flex:1}}><div style={{fontWeight:800,fontSize:14}}>{eng.name}</div><div style={{color:C.light,fontSize:11}}>{eng.phone} · {eng.email}</div></div>
+                        {isOwner&&<span style={{fontWeight:800,color:accent,fontSize:13}}>£{eng.rate}/job</span>}
+                        <Btn onClick={()=>setEditEng({eng,user:engUser})} variant="ghost" sm>Edit</Btn>
+                      </div>
+
+                      {/* Stats row */}
+                      <div style={{padding:"10px 15px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4,borderBottom:`1px solid ${C.border}`,background:"#161B22"}}>
+                        {[["Active",active,C.primary],["Repaired",done,C.success],["BER",ber,C.danger],["Success",sr!==null?`${sr}%`:"—",sr>=80?C.success:sr>=60?C.warn:sr!==null?C.danger:C.light]].map(([l,v,col])=>(
+                          <div key={l} style={{textAlign:"center"}}><div style={{fontWeight:900,fontSize:17,color:col}}>{v}</div><div style={{fontSize:9,color:C.light,textTransform:"uppercase",letterSpacing:.3}}>{l}</div></div>
+                        ))}
+                      </div>
+
+                      {/* Coverage */}
+                      <div style={{padding:"9px 15px",borderBottom:`1px solid ${C.border}`}}>
+                        <div style={{fontSize:9,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:5,letterSpacing:.4}}>Postcode Areas</div>
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                          {eng.postcodes.length?eng.postcodes.map(pc=><span key={pc} style={{background:C.primaryLight,color:C.primary,fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:4}}>{pc}</span>):<span style={{color:C.light,fontSize:11,fontStyle:"italic"}}>None set</span>}
+                        </div>
+                      </div>
+                      <div style={{padding:"9px 15px",borderBottom:`1px solid ${C.border}`}}>
+                        <div style={{fontSize:9,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:5,letterSpacing:.4}}>Appliances Covered</div>
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                          {eng.applianceTypes.length?eng.applianceTypes.map(a=><span key={a} style={{background:C.successLight,color:C.success,fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:4}}>{a}</span>):<span style={{color:C.light,fontSize:11,fontStyle:"italic"}}>None set</span>}
+                        </div>
+                      </div>
+
+                      {isOwner&&owed>0&&<div style={{padding:"7px 15px",background:"rgba(248,113,113,0.12)",fontSize:12,color:"#f87171",fontWeight:700}}>£{owed} owed in unpaid jobs</div>}
+
+                      {/* Recent jobs */}
+                      <div style={{padding:"8px 15px"}}>
+                        {eJobs.filter(j=>!["Completed","Beyond Repair","Cancelled"].includes(j.status)).slice(0,2).map(j=>(
+                          <div key={j.id} onClick={()=>setSelJob(j)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,padding:"4px 0",cursor:"pointer",color:C.mid}} onMouseOver={e=>e.currentTarget.style.color=C.primary} onMouseOut={e=>e.currentTarget.style.color=C.mid}>
+                            <span><strong style={{color:C.text}}>{j.customer}</strong> · {j.appliance}{j.brand?` · ${j.brand}`:""}</span><Badge status={j.status}/>
+                          </div>
+                        ))}
+                        {!eJobs.filter(j=>!["Completed","Beyond Repair","Cancelled"].includes(j.status)).length&&<div style={{fontSize:11,color:C.light,fontStyle:"italic"}}>No active jobs</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── PAYMENTS ── */}
+          {view==="payments"&&(
+            <div>
+              <h1 style={{margin:"0 0 16px",fontSize:19,fontWeight:900,color:C.text}}>{isEng?"My Pay":"Payments"}</h1>
+              {(isEng?engineers.filter(e=>e.id===currentUser.engineerId):engineers).map(eng=>{
+                const done=jobs.filter(j=>j.engineerId===eng.id&&j.status==="Completed");
+                const ber=jobs.filter(j=>j.engineerId===eng.id&&j.status==="Beyond Repair");
+                const unpaid=done.filter(j=>!j.paid);
+                const paid=done.filter(j=>j.paid);
+                return (
+                  <div key={eng.id} style={{background:C.card,borderRadius:13,boxShadow:"0 1px 3px rgba(0,0,0,.05)",marginBottom:16,overflow:"hidden"}}>
+                    <div style={{padding:"13px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",background:"#161B22"}}>
+                      <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                        <Av initials={eng.name.split(" ").map(w=>w[0]).join("")} color={accent}/>
+                        <div><div style={{fontWeight:800,fontSize:14}}>{eng.name}</div><div style={{color:C.light,fontSize:11}}>{done.length} completed · {ber.length} BER</div></div>
+                      </div>
+                      <div style={{textAlign:"right"}}><div style={{color:C.danger,fontWeight:900,fontSize:16}}>£{unpaid.reduce((s,j)=>s+Number(j.rate||0),0)} owed</div><div style={{color:C.success,fontSize:11,fontWeight:600}}>£{paid.reduce((s,j)=>s+Number(j.rate||0),0)} paid total</div></div>
+                    </div>
+                    {unpaid.length===0?<div style={{padding:"11px 18px",color:C.success,fontWeight:600,fontSize:12}}>✓ All payments up to date</div>:unpaid.map(j=>(
+                      <div key={j.id} style={{padding:"9px 18px",borderBottom:`1px solid #262626`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div><span style={{fontWeight:700,fontSize:13}}>#{j.id} {j.customer}</span><span style={{color:C.light,fontSize:11}}> · {j.appliance}{j.brand?` · ${j.brand}`:""} · {fmt(j.completedDate||j.scheduledDate)}</span></div>
+                        <div style={{display:"flex",gap:9,alignItems:"center"}}>
+                          <span style={{fontWeight:800,color:C.danger}}>£{j.rate}</span>
+                          {!isEng&&isOwner&&<Btn onClick={()=>setJobs(js=>js.map(x=>x.id===j.id?{...x,paid:true}:x))} variant="success" sm>Mark Paid</Btn>}
+                        </div>
+                      </div>
+                    ))}
+                    {paid.length>0&&<div style={{padding:"9px 18px",background:"#161B22"}}>
+                      <div style={{fontSize:9,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:5,letterSpacing:.4}}>Payment History</div>
+                      {paid.map(j=><div key={j.id} style={{display:"flex",justifyContent:"space-between",fontSize:11,padding:"3px 0",color:C.mid}}><span>#{j.id} {j.customer} · {j.appliance}{j.brand?` · ${j.brand}`:""}</span><span style={{color:C.success,fontWeight:700}}>£{j.rate} ✓</span></div>)}
+                    </div>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── USERS ── */}
+          {view==="users"&&isOwner&&<UserManager users={users} setUsers={setUsers} engineers={engineers} setEngineers={setEngineers}/>}
+
+        </div>
       </div>
-    </div>
-  );
-}
 
-function UserEditModal({ user, onClose, onSave, isNew }) {
-  const [form, setForm] = useState({ ...user });
-  const canSave = form.name.trim() && form.email.trim() && form.password.trim();
-
-  const footerContent = (
-    <div className="flex items-center justify-end gap-2">
-      {!canSave && <p className="text-xs text-rose-500 mr-auto">Name, email, and password are required.</p>}
-      <button onClick={onClose} className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium">Cancel</button>
-      <button
-        onClick={() => { if (canSave) onSave(form); }}
-        className="px-4 py-2 rounded-lg text-sm font-medium bg-teal-600 text-white hover:bg-teal-700"
-      >
-        {isNew ? "Add User" : "Save changes"}
-      </button>
-    </div>
-  );
-
-  return (
-    <Modal title={isNew ? "Add New User" : `Edit ${user.name}`} onClose={onClose} footer={footerContent}>
-      <Field label="Name"><input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-      <Field label="Email"><input className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-      <Field label="Password"><input className={inputCls} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
-      <Field label="Phone"><input className={inputCls} value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
-      <Field label="Role">
-        <select className={inputCls} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-          <option value="owner">Owner</option>
-          <option value="staff">Staff</option>
-          {!isNew && <option value="engineer">Engineer</option>}
-        </select>
-      </Field>
-      {isNew && (
-        <p className="text-xs text-slate-500 -mt-2 mb-3">
-          To add an engineer, use the <strong>+ Add Engineer</strong> button on the Engineers tab instead — it captures their
-          coverage area, appliance types, and lead preferences in one place.
-        </p>
+      {/* ── MODALS ── */}
+      {(showNew||editJob)&&(
+        <Modal title={editJob?`Edit Job #${editJob.id}`:"New Booking"} onClose={()=>{setShowNew(false);setEditJob(null);}} wide>
+          <JobForm initial={editJob} onSave={saveJob} onCancel={()=>{setShowNew(false);setEditJob(null);}} canEditRate={isOwner} engineers={engineers} jobs={jobs}/>
+        </Modal>
       )}
-      {form.role === "engineer" && (
-        <Field label="Pay rate per job (£)">
-          <input className={inputCls} type="number" value={form.payRate || 0} onChange={(e) => setForm({ ...form, payRate: Number(e.target.value) })} />
-        </Field>
+      {selJob&&!editJob&&!reassign&&(
+        <Modal title={`Job #${selJob.id} — ${selJob.customer}`} onClose={()=>setSelJob(null)} wide>
+          <JobDetail job={selJob} onClose={()=>setSelJob(null)} onEdit={()=>{setEditJob(selJob);setSelJob(null);}} onReassign={()=>setReassign(selJob)} currentUser={currentUser} onEngUpdate={engUpdate} engineers={engineers}/>
+        </Modal>
       )}
-    </Modal>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* App                                                                  */
-/* ------------------------------------------------------------------ */
-
-export default function App() {
-  const [users, setUsers] = useState(initialUsers);
-  const [jobs, setJobs] = useState(initialJobs);
-  const [leads, setLeads] = useState(initialLeads);
-  const [billingRuns, setBillingRuns] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [activeView, setActiveView] = useState("dashboard");
-  const [openJob, setOpenJob] = useState(null);
-  const [editEngineer, setEditEngineer] = useState(null);
-  const [editUser, setEditUser] = useState(null);
-
-  const engineers = users.filter((u) => u.role === "engineer");
-
-  function blankEngineer() {
-    return {
-      id: `u-eng-${Date.now()}`,
-      role: "engineer",
-      name: "",
-      email: "",
-      password: "",
-      phone: "",
-      payRate: 40,
-      postcodes: [],
-      applianceTypes: [],
-      brandExclusions: {},
-      integratedExclusions: [],
-      stats: { completed: 0, ber: 0 },
-      engineerType: "both",
-      leadPrefs: { active: true, dailyLeadTarget: 5, pricePerLead: 10, cardLast4: null },
-    };
-  }
-
-  function blankUser() {
-    return {
-      id: `u-${Date.now()}`,
-      role: "staff",
-      name: "",
-      email: "",
-      password: "",
-      phone: "",
-    };
-  }
-
-  function handleLogin(user) {
-    setCurrentUser(user);
-    setActiveView(user.role === "engineer" ? "myjobs" : "dashboard");
-  }
-
-  function updateJob(updated) {
-    setJobs((js) => js.map((j) => (j.id === updated.id ? updated : j)));
-    setOpenJob(updated);
-  }
-
-  function autoAssignJob(job) {
-    const best = findBestEngineerForJob(engineers, jobs, job);
-    if (best) updateJob({ ...job, engineerId: best.id, status: "assigned" });
-  }
-
-  function saveEngineer(form) {
-    setUsers((us) => {
-      const exists = us.some((u) => u.id === form.id);
-      return exists ? us.map((u) => (u.id === form.id ? form : u)) : [...us, form];
-    });
-    setEditEngineer(null);
-    if (currentUser.id === form.id) setCurrentUser(form);
-  }
-
-  function updateOwnLeadTarget(newTarget) {
-    setUsers((us) =>
-      us.map((u) => (u.id === currentUser.id ? { ...u, leadPrefs: { ...u.leadPrefs, dailyLeadTarget: newTarget } } : u))
-    );
-    setCurrentUser((cu) => ({ ...cu, leadPrefs: { ...cu.leadPrefs, dailyLeadTarget: newTarget } }));
-  }
-
-  function saveUser(form) {
-    setUsers((us) => {
-      const exists = us.some((u) => u.id === form.id);
-      return exists ? us.map((u) => (u.id === form.id ? form : u)) : [...us, form];
-    });
-    setEditUser(null);
-  }
-
-  function createLead(form) {
-    const newLead = {
-      id: `l-${Date.now()}`,
-      ...form,
-      engineerId: null,
-      status: "unassigned",
-      price: null,
-      billed: false,
-      createdAt: new Date().toISOString(),
-      assignedAt: null,
-    };
-    const best = findBestEngineerForLead(engineers, leads, newLead);
-    const assigned = best
-      ? { ...newLead, engineerId: best.id, status: "assigned", price: best.leadPrefs.pricePerLead, assignedAt: new Date().toISOString() }
-      : newLead;
-    setLeads((ls) => [...ls, assigned]);
-  }
-
-  function autoAssignLead(lead) {
-    const best = findBestEngineerForLead(engineers, leads, lead);
-    if (best) {
-      setLeads((ls) =>
-        ls.map((l) =>
-          l.id === lead.id
-            ? { ...l, engineerId: best.id, status: "assigned", price: best.leadPrefs.pricePerLead, assignedAt: new Date().toISOString() }
-            : l
-        )
-      );
-    }
-  }
-
-  function runBilling() {
-    const today = todayStr();
-    const entries = engineers
-      .map((e) => {
-        const billable = leads.filter((l) => l.engineerId === e.id && l.status === "assigned" && l.assignedAt?.startsWith(today) && !l.billed);
-        if (billable.length === 0) return null;
-        return {
-          engineerId: e.id,
-          engineerName: e.name,
-          count: billable.length,
-          total: billable.length * e.leadPrefs.pricePerLead,
-          cardLast4: e.leadPrefs.cardLast4,
-          leadIds: billable.map((l) => l.id),
-        };
-      })
-      .filter(Boolean);
-    if (entries.length === 0) return;
-    const run = {
-      id: `run-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      total: entries.reduce((s, e) => s + e.total, 0),
-      entries,
-    };
-    setBillingRuns((rs) => [run, ...rs]);
-    const billedIds = new Set(entries.flatMap((e) => e.leadIds));
-    setLeads((ls) => ls.map((l) => (billedIds.has(l.id) ? { ...l, billed: true } : l)));
-  }
-
-  function markJobPaid(job) {
-    updateJob({ ...job, paid: true });
-  }
-
-  if (!currentUser) return <LoginScreen users={users} onLogin={handleLogin} />;
-
-  return (
-    <div className="flex min-h-screen bg-slate-50 font-sans">
-      <Sidebar currentUser={currentUser} activeView={activeView} setActiveView={setActiveView} onLogout={() => setCurrentUser(null)} />
-      <main className="flex-1 p-8">
-        {activeView === "dashboard" && <DashboardView jobs={jobs} engineers={engineers} />}
-        {activeView === "jobs" && (
-          <JobsView jobs={jobs} engineers={engineers} currentUser={currentUser} onOpenJob={setOpenJob} restrictToEngineer={false} />
-        )}
-        {activeView === "myjobs" && (
-          <JobsView jobs={jobs} engineers={engineers} currentUser={currentUser} onOpenJob={setOpenJob} restrictToEngineer={true} />
-        )}
-        {activeView === "leads" && (
-          <LeadsView leads={leads} engineers={engineers} onCreateLead={createLead} onAutoAssign={autoAssignLead} />
-        )}
-        {activeView === "myleads" && <MyLeadsView leads={leads} currentUser={currentUser} onUpdateTarget={updateOwnLeadTarget} />}
-        {activeView === "engineers" && (
-          <EngineersView engineers={engineers} jobs={jobs} leads={leads} currentUser={currentUser} onEdit={setEditEngineer} onAddEngineer={() => setEditEngineer(blankEngineer())} />
-        )}
-        {activeView === "payments" && (
-          <PaymentsView
-            jobs={jobs}
-            leads={leads}
-            engineers={engineers}
-            currentUser={currentUser}
-            onMarkPaid={markJobPaid}
-            billingRuns={billingRuns}
-            onRunBilling={runBilling}
-          />
-        )}
-        {activeView === "users" && <UsersView users={users} onEditUser={setEditUser} onAddUser={() => setEditUser(blankUser())} />}
-      </main>
-
-      {openJob && (
-        <JobDetailModal
-          job={openJob}
-          engineers={engineers}
-          currentUser={currentUser}
-          onClose={() => setOpenJob(null)}
-          onUpdate={updateJob}
-          onAutoAssign={autoAssignJob}
-        />
+      {reassign&&(
+        <ReassignModal job={reassign} engineers={engineers} jobs={jobs} onReassign={doReassign} onClose={()=>setReassign(null)}/>
       )}
-      {editEngineer && (
-        <EngineerEditModal
-          engineer={editEngineer}
-          currentUser={currentUser}
-          onClose={() => setEditEngineer(null)}
-          onSave={saveEngineer}
-          isNew={!users.some((u) => u.id === editEngineer.id)}
-        />
-      )}
-      {editUser && (
-        <UserEditModal
-          user={editUser}
-          onClose={() => setEditUser(null)}
-          onSave={saveUser}
-          isNew={!users.some((u) => u.id === editUser.id)}
-        />
+      {editEng&&(
+        <Modal title={`Edit Engineer: ${editEng.eng.name}`} onClose={()=>setEditEng(null)} wide>
+          <EngineerEditor eng={editEng.eng} user={editEng.user} onSave={saveEng} onCancel={()=>setEditEng(null)} isOwner={isOwner}/>
+        </Modal>
       )}
     </div>
   );
