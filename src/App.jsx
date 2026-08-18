@@ -14,6 +14,52 @@ const BRANDS = {
 };
 const SOURCES  = ["Website","Manchester Site","Leeds Site","Sheffield Site","Liverpool Site","Birmingham Site","Direct Call","Other"];
 const STATUSES = ["Booked","Assigned","Parts Awaited","In Progress","Completed","Beyond Repair","Cancelled"];
+// Standard Royal Mail postcode area list (124 areas) -- used by
+// Settings -> Websites -> Pricing to let pricing be set per area.
+const POSTCODE_AREAS = [
+  {code:"AB",name:"Aberdeen"},{code:"AL",name:"St Albans"},{code:"B",name:"Birmingham"},
+  {code:"BA",name:"Bath"},{code:"BB",name:"Blackburn"},{code:"BD",name:"Bradford"},
+  {code:"BH",name:"Bournemouth"},{code:"BL",name:"Bolton"},{code:"BN",name:"Brighton"},
+  {code:"BR",name:"Bromley"},{code:"BS",name:"Bristol"},{code:"BT",name:"Belfast"},
+  {code:"CA",name:"Carlisle"},{code:"CB",name:"Cambridge"},{code:"CF",name:"Cardiff"},
+  {code:"CH",name:"Chester"},{code:"CM",name:"Chelmsford"},{code:"CO",name:"Colchester"},
+  {code:"CR",name:"Croydon"},{code:"CT",name:"Canterbury"},{code:"CV",name:"Coventry"},
+  {code:"CW",name:"Crewe"},{code:"DA",name:"Dartford"},{code:"DD",name:"Dundee"},
+  {code:"DE",name:"Derby"},{code:"DG",name:"Dumfries"},{code:"DH",name:"Durham"},
+  {code:"DL",name:"Darlington"},{code:"DN",name:"Doncaster"},{code:"DT",name:"Dorchester"},
+  {code:"DY",name:"Dudley"},{code:"E",name:"London E"},{code:"EC",name:"London EC"},
+  {code:"EH",name:"Edinburgh"},{code:"EN",name:"Enfield"},{code:"EX",name:"Exeter"},
+  {code:"FK",name:"Falkirk"},{code:"FY",name:"Blackpool"},{code:"G",name:"Glasgow"},
+  {code:"GL",name:"Gloucester"},{code:"GU",name:"Guildford"},{code:"GY",name:"Guernsey"},
+  {code:"HA",name:"Harrow"},{code:"HD",name:"Huddersfield"},{code:"HG",name:"Harrogate"},
+  {code:"HP",name:"Hemel Hempstead"},{code:"HR",name:"Hereford"},{code:"HS",name:"Outer Hebrides"},
+  {code:"HU",name:"Hull"},{code:"HX",name:"Halifax"},{code:"IG",name:"Ilford"},
+  {code:"IM",name:"Isle of Man"},{code:"IP",name:"Ipswich"},{code:"IV",name:"Inverness"},
+  {code:"JE",name:"Jersey"},{code:"KA",name:"Kilmarnock"},{code:"KT",name:"Kingston upon Thames"},
+  {code:"KW",name:"Kirkwall"},{code:"KY",name:"Kirkcaldy"},{code:"L",name:"Liverpool"},
+  {code:"LA",name:"Lancaster"},{code:"LD",name:"Llandrindod Wells"},{code:"LE",name:"Leicester"},
+  {code:"LL",name:"Llandudno"},{code:"LN",name:"Lincoln"},{code:"LS",name:"Leeds"},
+  {code:"LU",name:"Luton"},{code:"M",name:"Manchester"},{code:"ME",name:"Medway"},
+  {code:"MK",name:"Milton Keynes"},{code:"ML",name:"Motherwell"},{code:"N",name:"London N"},
+  {code:"NE",name:"Newcastle upon Tyne"},{code:"NG",name:"Nottingham"},{code:"NN",name:"Northampton"},
+  {code:"NP",name:"Newport"},{code:"NR",name:"Norwich"},{code:"NW",name:"London NW"},
+  {code:"OL",name:"Oldham"},{code:"OX",name:"Oxford"},{code:"PA",name:"Paisley"},
+  {code:"PE",name:"Peterborough"},{code:"PH",name:"Perth"},{code:"PL",name:"Plymouth"},
+  {code:"PO",name:"Portsmouth"},{code:"PR",name:"Preston"},{code:"RG",name:"Reading"},
+  {code:"RH",name:"Redhill"},{code:"RM",name:"Romford"},{code:"S",name:"Sheffield"},
+  {code:"SA",name:"Swansea"},{code:"SE",name:"London SE"},{code:"SG",name:"Stevenage"},
+  {code:"SK",name:"Stockport"},{code:"SL",name:"Slough"},{code:"SM",name:"Sutton"},
+  {code:"SN",name:"Swindon"},{code:"SO",name:"Southampton"},{code:"SP",name:"Salisbury"},
+  {code:"SR",name:"Sunderland"},{code:"SS",name:"Southend-on-Sea"},{code:"ST",name:"Stoke-on-Trent"},
+  {code:"SW",name:"London SW"},{code:"SY",name:"Shrewsbury"},{code:"TA",name:"Taunton"},
+  {code:"TD",name:"Galashiels"},{code:"TF",name:"Telford"},{code:"TN",name:"Tonbridge"},
+  {code:"TQ",name:"Torquay"},{code:"TR",name:"Truro"},{code:"TS",name:"Cleveland"},
+  {code:"TW",name:"Twickenham"},{code:"UB",name:"Southall"},{code:"W",name:"London W"},
+  {code:"WA",name:"Warrington"},{code:"WC",name:"London WC"},{code:"WD",name:"Watford"},
+  {code:"WF",name:"Wakefield"},{code:"WN",name:"Wigan"},{code:"WR",name:"Worcester"},
+  {code:"WS",name:"Walsall"},{code:"WV",name:"Wolverhampton"},{code:"YO",name:"York"},
+  {code:"ZE",name:"Lerwick"},
+];
 // Was hardcoded to a fixed demo date ("2026-06-06") left over from before real
 // bookings existed -- that's why "Today's Bookings" on the dashboard sat at 0
 // no matter what got completed: it was comparing every booking's
@@ -934,6 +980,246 @@ function engineerProfileGaps(eng){
   return gaps;
 }
 
+// Maps `pricing` rows (one per postcode_area+appliance_type[+brand]) into
+// the per-area shape SettingsView/AreaPricingModal work with: one entry per
+// appliance type, either a single `all` price row or a `perBrand` map keyed
+// by brand. A row with brand===null is the "applies to every brand" row;
+// a row with a brand set overrides just that brand.
+function groupPricingRows(rows){
+  const byArea = {};
+  for(const r of (rows||[])){
+    byArea[r.postcode_area] ||= {};
+    byArea[r.postcode_area][r.appliance_type] ||= {enabled:true,mode:"single",all:null,perBrand:{}};
+    const entry = byArea[r.postcode_area][r.appliance_type];
+    const fields = {
+      displayPrice: r.display_price, minAreaPrice: r.min_area_price,
+      engineerPct: r.engineer_pct, easyRepairPct: r.easy_repair_pct,
+      retainedVariancePct: r.retained_variance_pct,
+    };
+    if(r.brand==null){ entry.all = fields; entry.mode = Object.keys(entry.perBrand).length ? "perBrand" : "single"; }
+    else { entry.perBrand[r.brand] = fields; entry.mode = "perBrand"; }
+  }
+  return byArea;
+}
+
+// ─── SETTINGS -> WEBSITES -> PRICING ─────────────────────────────────────────
+// Per-postcode-area, per-appliance-type (optionally per-brand) pricing, used
+// for dynamic PPC bidding: what the website advertises, the agreed floor
+// price for that area, and how a booking at that floor price splits between
+// Easy Repair and the engineer -- plus how much of the gap between the
+// advertised price and the floor ("variance") Easy Repair keeps versus
+// effectively passes through. Owner-only, same gating as the Users tab.
+function computePriceSplit(fields){
+  const display = Number(fields?.displayPrice)||0;
+  const min = Number(fields?.minAreaPrice)||0;
+  const engPct = Number(fields?.engineerPct)||0;
+  const erPct = Number(fields?.easyRepairPct)||0;
+  const varPct = Number(fields?.retainedVariancePct)||0;
+  const variance = Math.max(display-min,0);
+  const engAmount = min*engPct/100;
+  const erBaseAmount = min*erPct/100;
+  const erVarianceAmount = variance*varPct/100;
+  const engVarianceAmount = variance-erVarianceAmount;
+  return {
+    variance, engTotal: engAmount+engVarianceAmount, erTotal: erBaseAmount+erVarianceAmount,
+    splitWarning: Math.round(engPct+erPct)!==100,
+  };
+}
+function blankPriceFields(){
+  return {displayPrice:"",minAreaPrice:"",engineerPct:60,easyRepairPct:40,retainedVariancePct:100};
+}
+function PriceFieldsRow({fields,onChange}){
+  const s = computePriceSplit(fields);
+  const set = (k,v)=>onChange({...fields,[k]:v});
+  return (
+    <div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr",gap:8}}>
+        <Fl label="Website Price (£)"><input type="number" style={inp} value={fields.displayPrice} onChange={e=>set("displayPrice",e.target.value)}/></Fl>
+        <Fl label="Min Area Price (£)"><input type="number" style={inp} value={fields.minAreaPrice} onChange={e=>set("minAreaPrice",e.target.value)}/></Fl>
+        <Fl label="Engineer %"><input type="number" style={inp} value={fields.engineerPct} onChange={e=>set("engineerPct",e.target.value)}/></Fl>
+        <Fl label="Easy Repair %"><input type="number" style={inp} value={fields.easyRepairPct} onChange={e=>set("easyRepairPct",e.target.value)}/></Fl>
+        <Fl label="ER Retains Variance %"><input type="number" style={inp} value={fields.retainedVariancePct} onChange={e=>set("retainedVariancePct",e.target.value)}/></Fl>
+      </div>
+      <div style={{fontSize:11,background:"#161B22",borderRadius:7,padding:"7px 10px",display:"flex",gap:16,flexWrap:"wrap",marginTop:-4,marginBottom:10}}>
+        <span style={{color:C.mid}}>Variance: <strong style={{color:C.text}}>£{s.variance.toFixed(2)}</strong></span>
+        <span style={{color:C.primary}}>Engineer gets: <strong>£{s.engTotal.toFixed(2)}</strong></span>
+        <span style={{color:C.purple}}>Easy Repair gets: <strong>£{s.erTotal.toFixed(2)}</strong></span>
+        {s.splitWarning&&<span style={{color:C.danger}}>Engineer % + Easy Repair % should total 100</span>}
+      </div>
+    </div>
+  );
+}
+
+function AreaPricingModal({area,existing,onClose,onSaved}){
+  const [form,setForm] = useState(()=>{
+    const init = {};
+    for(const type of APPLIANCE_TYPES){
+      const e = existing?.[type];
+      init[type] = e ? {enabled:true,mode:e.mode,all:e.all||blankPriceFields(),perBrand:{...e.perBrand}} : {enabled:false,mode:"single",all:blankPriceFields(),perBrand:{}};
+    }
+    return init;
+  });
+  const [busy,setBusy] = useState(false);
+  const [err,setErr] = useState("");
+
+  const toggleType = (type) => setForm(f=>({...f,[type]:{...f[type],enabled:!f[type].enabled}}));
+  const setMode = (type,mode) => setForm(f=>({...f,[type]:{...f[type],mode}}));
+  const setAll = (type,fields) => setForm(f=>({...f,[type]:{...f[type],all:fields}}));
+  const setBrand = (type,brand,fields) => setForm(f=>({...f,[type]:{...f[type],perBrand:{...f[type].perBrand,[brand]:fields}}}));
+  const copyFirstBrand = (type) => setForm(f=>{
+    const brands = BRANDS[type]||[];
+    const template = f[type].perBrand[brands[0]] || blankPriceFields();
+    const perBrand = {};
+    brands.forEach(b=>{ perBrand[b]={...template}; });
+    return {...f,[type]:{...f[type],perBrand}};
+  });
+
+  const submit = async () => {
+    setErr(""); setBusy(true);
+    try {
+      for(const type of APPLIANCE_TYPES){
+        const t = form[type];
+        // Simplest reliable way to keep this in sync with what's on screen:
+        // clear whatever's stored for this area+appliance, then reinsert
+        // only what should actually be there now.
+        await supabase.from("pricing").delete().eq("postcode_area",area.code).eq("appliance_type",type);
+        if(!t.enabled) continue;
+        if(t.mode==="single"){
+          await supabase.from("pricing").insert({
+            postcode_area:area.code, appliance_type:type, brand:null,
+            display_price:t.all.displayPrice===""?null:Number(t.all.displayPrice),
+            min_area_price:t.all.minAreaPrice===""?null:Number(t.all.minAreaPrice),
+            engineer_pct:Number(t.all.engineerPct)||0, easy_repair_pct:Number(t.all.easyRepairPct)||0,
+            retained_variance_pct:Number(t.all.retainedVariancePct)||0,
+          });
+        } else {
+          const rows = (BRANDS[type]||[]).map(brand=>{
+            const f = t.perBrand[brand]||blankPriceFields();
+            return {
+              postcode_area:area.code, appliance_type:type, brand,
+              display_price:f.displayPrice===""?null:Number(f.displayPrice),
+              min_area_price:f.minAreaPrice===""?null:Number(f.minAreaPrice),
+              engineer_pct:Number(f.engineerPct)||0, easy_repair_pct:Number(f.easyRepairPct)||0,
+              retained_variance_pct:Number(f.retainedVariancePct)||0,
+            };
+          });
+          if(rows.length) await supabase.from("pricing").insert(rows);
+        }
+      }
+      setBusy(false);
+      onSaved();
+    } catch(e){
+      setBusy(false);
+      setErr(e.message||"Something went wrong saving this area's pricing.");
+    }
+  };
+
+  return (
+    <Modal title={`Pricing for ${area.code} — ${area.name}`} onClose={onClose} wide>
+      {err&&<div style={{background:"rgba(248,113,113,0.15)",color:"#f87171",borderRadius:7,padding:"8px 12px",fontSize:13,marginBottom:12,fontWeight:600}}>{err}</div>}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {APPLIANCE_TYPES.map(type=>{
+          const t = form[type];
+          return (
+            <div key={type} style={{border:`1px solid ${C.border}`,borderRadius:9,padding:"10px 12px"}}>
+              <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                <input type="checkbox" checked={t.enabled} onChange={()=>toggleType(type)}/> {type}
+              </label>
+              {t.enabled ? (
+                <div style={{marginTop:8}}>
+                  <div style={{display:"flex",gap:16,marginBottom:8}}>
+                    <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.mid,cursor:"pointer"}}>
+                      <input type="radio" checked={t.mode==="single"} onChange={()=>setMode(type,"single")}/> One price across every brand
+                    </label>
+                    <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.mid,cursor:"pointer"}}>
+                      <input type="radio" checked={t.mode==="perBrand"} onChange={()=>setMode(type,"perBrand")}/> Different price per brand
+                    </label>
+                  </div>
+                  {t.mode==="single" ? (
+                    <PriceFieldsRow fields={t.all} onChange={f=>setAll(type,f)}/>
+                  ) : (
+                    <div>
+                      <button onClick={()=>copyFirstBrand(type)} style={{background:"none",border:"none",color:C.primary,fontSize:11,fontWeight:700,cursor:"pointer",padding:0,marginBottom:8}}>
+                        Copy {(BRANDS[type]||[])[0]}'s pricing to every brand
+                      </button>
+                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                        {(BRANDS[type]||[]).map(brand=>(
+                          <div key={brand} style={{background:"#161B22",borderRadius:7,padding:"8px 10px"}}>
+                            <div style={{fontSize:11,fontWeight:700,color:C.mid,marginBottom:6}}>{brand}</div>
+                            <PriceFieldsRow fields={t.perBrand[brand]||blankPriceFields()} onChange={f=>setBrand(type,brand,f)}/>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{fontSize:11,color:C.light,marginTop:4,marginLeft:24}}>Tick to set pricing for this appliance type in this area</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{display:"flex",gap:10,marginTop:16}}>
+        <Btn onClick={submit} full style={{padding:"10px 0",opacity:busy?.7:1}}>{busy?"Saving…":"Save Pricing"}</Btn>
+        <Btn onClick={onClose} variant="ghost" full style={{padding:"10px 0"}}>Cancel</Btn>
+      </div>
+    </Modal>
+  );
+}
+
+function SettingsView({pricing,onReload}){
+  const [editArea,setEditArea] = useState(null);
+  const [search,setSearch] = useState("");
+  const grouped = useMemo(()=>groupPricingRows(pricing),[pricing]);
+
+  const visible = POSTCODE_AREAS.filter(a=>
+    !search || a.code.toLowerCase().includes(search.toLowerCase()) || a.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const saveArea = async () => { await onReload(); setEditArea(null); };
+
+  return (
+    <div>
+      <h1 style={{margin:"0 0 16px",fontSize:19,fontWeight:900,color:C.text}}>Settings</h1>
+      <div style={{fontSize:12,fontWeight:700,color:C.mid,textTransform:"uppercase",letterSpacing:.6,marginBottom:10}}>Websites → Pricing</div>
+      <div style={{fontSize:13,color:C.mid,lineHeight:1.5,marginBottom:14}}>
+        Set dynamic pricing per postcode area -- a website display price, an agreed minimum, and how the booking splits
+        between Easy Repair and the engineer. Choose one price across every brand, or break it down brand by brand.
+      </div>
+      <input style={{...inp,maxWidth:260,marginBottom:14}} placeholder="Search area code or name…" value={search} onChange={e=>setSearch(e.target.value)}/>
+      <div style={{background:C.card,borderRadius:13,overflow:"hidden",border:`1px solid ${C.border}`}}>
+        {visible.map(a=>{
+          const cfg = grouped[a.code]||{};
+          const count = APPLIANCE_TYPES.filter(t=>cfg[t]?.enabled).length;
+          return (
+            <div key={a.code} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 16px",borderBottom:`1px solid ${C.border}`}}>
+              <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                <span style={{fontWeight:800,fontSize:13,width:34}}>{a.code}</span>
+                <span style={{fontSize:13,color:C.mid}}>{a.name}</span>
+              </div>
+              <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                {count===0 ? (
+                  <span style={{background:"rgba(255,255,255,0.07)",color:C.light,padding:"2px 9px",borderRadius:20,fontSize:11,fontWeight:700}}>Not set up</span>
+                ) : (
+                  <span style={{background:C.primaryLight,color:C.primary,padding:"2px 9px",borderRadius:20,fontSize:11,fontWeight:700}}>{count}/{APPLIANCE_TYPES.length} configured</span>
+                )}
+                <Btn onClick={()=>setEditArea(a)} variant="ghost" sm>Edit Pricing</Btn>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {editArea&&(
+        <AreaPricingModal area={editArea} existing={grouped[editArea.code]} onClose={()=>setEditArea(null)} onSaved={saveArea}/>
+      )}
+    </div>
+  );
+}
+
+
+
+
 // ─── ONBOARDING / ARCHIVE ───────────────────────────────────────────────────
 // The full journey a new engineer goes through, in order. Each `done` check
 // reuses the exact same fields engineerProfileGaps() (above) and Portal's own
@@ -993,6 +1279,7 @@ export default function App() {
   const [resetPwBusy,setResetPwBusy]     = useState(false);
   const [resetPwErr,setResetPwErr]       = useState("");
   const [resetPwResult,setResetPwResult] = useState(null); // {email,tempPassword,message,warning} from the Edge Function
+  const [pricing,setPricing]      = useState([]);
 
   const isOwner = currentUser?.role==="owner";
   const accent  = {owner:C.purple,staff:C.primary}[currentUser?.role]||C.primary;
@@ -1024,6 +1311,14 @@ export default function App() {
     const { data, error } = await supabase.from("bookings").select("*").order("created_at",{ascending:false});
     if(error){ setLoadError(`Couldn't load bookings: ${error.message}`); return; }
     setLoadError(""); setJobs((data||[]).map(mapBookingRow));
+  };
+  // Owner-only (see 0003_pricing.sql's RLS) -- if a non-owner somehow ends up
+  // here this just quietly returns no rows rather than erroring, since
+  // Settings itself is already gated to isOwner in the sidebar/view switch.
+  const loadPricing = async () => {
+    const { data, error } = await supabase.from("pricing").select("*");
+    if(error){ setLoadError(`Couldn't load pricing: ${error.message}`); return; }
+    setLoadError(""); setPricing(data||[]);
   };
 
   // Archive/restore both just flip `profiles.archived_at` -- the existing
@@ -1108,7 +1403,7 @@ export default function App() {
     })();
   },[]);
 
-  useEffect(()=>{ if(currentUser){ loadEngineers(); loadStaffUsers(); loadBookings(); } },[currentUser]);
+  useEffect(()=>{ if(currentUser){ loadEngineers(); loadStaffUsers(); loadBookings(); if(currentUser.role==="owner") loadPricing(); } },[currentUser]);
 
   // Archived AND onboarding engineers drop out of new-booking/reassignment
   // pickers (see JobForm/ReassignModal below) but `engineers` itself stays
@@ -1184,7 +1479,7 @@ export default function App() {
     setEditEng(null);
   };
 
-  const NAV = [{id:"dashboard",label:"Dashboard",ic:"⊞"},{id:"jobs",label:"All Bookings",ic:"📋"},{id:"engineers",label:"Engineers",ic:"🔧"},{id:"payments",label:"Payments",ic:"£"},...(isOwner?[{id:"users",label:"Users",ic:"👤"}]:[])];
+  const NAV = [{id:"dashboard",label:"Dashboard",ic:"⊞"},{id:"jobs",label:"All Bookings",ic:"📋"},{id:"engineers",label:"Engineers",ic:"🔧"},{id:"payments",label:"Payments",ic:"£"},...(isOwner?[{id:"users",label:"Users",ic:"👤"},{id:"settings",label:"Settings",ic:"⚙️"}]:[])];
 
   // Clears the forced-password-change flag once they've set their own —
   // covers both provisioning paths (they typed the temp password directly,
@@ -1496,6 +1791,11 @@ export default function App() {
               onDelete={(u)=>askDelete(u.id,u.name||u.email)}
               onResetPassword={(u)=>askResetPassword(u.id,u.name||u.email)}
             />
+          )}
+
+          {/* ── SETTINGS ── */}
+          {view==="settings"&&isOwner&&(
+            <SettingsView pricing={pricing} onReload={loadPricing}/>
           )}
 
         </div>
