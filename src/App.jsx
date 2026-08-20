@@ -496,7 +496,8 @@ function JobDetail({job,onClose,onEdit,onReassign,onDelete,engineers}) {
       <div style={{background:"#1E2530",borderRadius:9,padding:12,marginBottom:12}}>
         <div style={{fontSize:10,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:4}}>Address</div>
         <div style={{fontSize:13}}>{job.address}</div>
-        <a href={`https://maps.google.com?q=${encodeURIComponent(job.address)}`} target="_blank" rel="noreferrer" style={{fontSize:12,color:C.primary,marginTop:3,display:"inline-block"}}>Open in Maps →</a>
+        {job.postcode&&<div style={{fontSize:13,fontWeight:700,color:C.text,marginTop:3,letterSpacing:.3}}>{job.postcode}</div>}
+        <a href={`https://maps.google.com?q=${encodeURIComponent(job.postcode?`${job.address}, ${job.postcode}`:job.address)}`} target="_blank" rel="noreferrer" style={{fontSize:12,color:C.primary,marginTop:3,display:"inline-block"}}>Open in Maps →</a>
       </div>
 
       <div style={{background:"#1E2530",borderRadius:9,padding:12,marginBottom:12}}>
