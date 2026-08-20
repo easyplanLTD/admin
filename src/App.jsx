@@ -285,7 +285,7 @@ function Login({onLogin}) {
     <div style={{minHeight:"100vh",background:"#000000",color:C.text,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Inter','Segoe UI',sans-serif",padding:16}}>
       <div style={{width:"100%",maxWidth:420}}>
         <div style={{textAlign:"center",marginBottom:32}}>
-          <img src="/logo.png" alt="Easy Repair" style={{height:40,margin:"0 auto 10px",display:"block"}}/>
+          <img src="/logo.png" alt="Easy Repair" style={{height:80,margin:"0 auto 10px",display:"block"}}/>
           <div style={{color:"#94A2B8",fontSize:11,marginTop:2}}>FixFlow — Internal Portal</div>
         </div>
         <div style={{background:"#141414",borderRadius:16,padding:30,boxShadow:"0 24px 80px rgba(0,0,0,.6)",border:"1px solid #262626"}}>
