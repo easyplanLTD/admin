@@ -12,7 +12,7 @@ const BRANDS = {
   "Hob":            ["AEG","Beko","Bosch","Candy","Hotpoint","Indesit","Neff","Siemens","Smeg","Other"],
   "Microwave":      ["Bosch","Hotpoint","LG","Panasonic","Samsung","Sharp","Siemens","Other"],
 };
-const SOURCES  = ["Website","Manchester Site","Leeds Site","Sheffield Site","Liverpool Site","Birmingham Site","Direct Call","Other"];
+const SOURCES  = ["Website","Manchester Site","Leeds Site","Sheffield Site","Liverpool Site","Birmingham Site","Direct Call","Other"]; function shortSource(url){try{var u=new URL(url);var p=u.pathname&&u.pathname!=="/"?u.pathname:"";return u.hostname+p;}catch(e){return url;}}
 const STATUSES = ["Booked","Assigned","Parts Awaited","In Progress","Completed","Beyond Repair","Cancelled"];
 // Standard Royal Mail postcode area list (124 areas) -- used by
 // Settings -> Websites -> Pricing to let pricing be set per area.
@@ -369,7 +369,7 @@ function JobForm({initial,onSave,onCancel,canEditRate,engineers,jobs}) {
         <Fl label="Customer Name"><input style={inp} value={f.customer} onChange={e=>set("customer",e.target.value)} placeholder="Full name"/></Fl>
         <Fl label="Phone"><input style={inp} value={f.phone} onChange={e=>set("phone",e.target.value)} placeholder="07..."/></Fl>
         <Fl label="Email"><input style={inp} value={f.email} onChange={e=>set("email",e.target.value)}/></Fl>
-        <Fl label="Source Website"><select style={inp} value={f.source} onChange={e=>set("source",e.target.value)}>{SOURCES.map(s=><option key={s}>{s}</option>)}</select></Fl>
+        <Fl label="Source Website"><select style={inp} value={f.source} onChange={e=>set("source",e.target.value)}>{SOURCES.map(s=><option key={s}>{s}</option>)}</select>{f.sourceUrl&&<div style={{fontSize:11,color:C.mid,marginTop:4,wordBreak:"break-all"}}>Captured URL: <a href={f.sourceUrl} target="_blank" rel="noreferrer" style={{color:C.primary}}>{f.sourceUrl}</a></div>}</Fl>
       </div>
       <Fl label="Full Address (inc. postcode)"><input style={inp} value={f.address} onChange={e=>set("address",e.target.value)} placeholder="Street, City, Postcode"/></Fl>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
@@ -501,7 +501,7 @@ function JobDetail({job,onClose,onEdit,onReassign,onDelete,engineers}) {
       </div>
 
       <div style={{background:"#1E2530",borderRadius:9,padding:12,marginBottom:12}}>
-        <div style={{fontSize:10,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:4}}>Fault Description</div>
+        {job.sourceUrl&&<div style={{background:"#1E2530",borderRadius:9,padding:12,marginBottom:12}}><div style={{fontSize:10,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:4}}>Booking Form URL</div><a href={job.sourceUrl} target="_blank" rel="noreferrer" style={{fontSize:13,color:C.primary,wordBreak:"break-all"}}>{job.sourceUrl}</a>{job.referrerUrl&&<div style={{color:C.mid,fontSize:12,marginTop:6}}>Referred from: {job.referrerUrl}</div>}</div>}<div style={{fontSize:10,color:C.light,fontWeight:700,textTransform:"uppercase",marginBottom:4}}>Fault Description</div>
         <div style={{fontSize:13}}>{job.issue}</div>
       </div>
 
@@ -1010,7 +1010,7 @@ function mapBookingRow(row){
     address: row.address||"", postcode: row.postcode||"",
     appliance: row.appliance, brand: row.brand||"", applianceAge: row.appliance_age??"",
     issue: row.issue||"", preferredCallTime: row.preferred_call_time||"",
-    source: row.source||"Website", status: row.status, engineerId: row.engineer_id,
+    source: row.source||"Website", sourceUrl: row.source_url||"", referrerUrl: row.referrer_url||"", status: row.status, engineerId: row.engineer_id,
     scheduledDate: row.scheduled_date||"", scheduledTime: row.scheduled_time||"",
     completedDate: row.completed_date||"", priority: row.priority||"Normal",
     partsNeeded: row.parts_needed, partsOrdered: row.parts_ordered, partsArrived: row.parts_arrived,
@@ -1815,7 +1815,7 @@ export default function App() {
                       const eng=engineers.find(e=>e.id===j.engineerId);
                       return <tr key={j.id} onClick={()=>setSelJob(j)} style={{cursor:"pointer",borderBottom:`1px solid #262626`}} onMouseOver={e=>e.currentTarget.style.background="#1E2530"} onMouseOut={e=>e.currentTarget.style.background="transparent"}>
                         <td style={{padding:"9px 13px",fontSize:12,color:C.primary,fontWeight:800}}>#{j.id}</td>
-                        <td style={{padding:"9px 13px"}}><div style={{fontWeight:700,fontSize:13}}>{j.customer}</div><div style={{color:C.light,fontSize:10}}>{j.source}</div></td>
+                        <td style={{padding:"9px 13px"}}><div style={{fontWeight:700,fontSize:13}}>{j.customer}</div><div style={{color:C.light,fontSize:10}} title={j.sourceUrl||j.source}>{j.sourceUrl?shortSource(j.sourceUrl):j.source}</div></td>
                         <td style={{padding:"9px 13px",fontSize:12}}>{j.appliance}</td>
                         <td style={{padding:"9px 13px",fontSize:12,fontWeight:600}}>{j.brand||<span style={{color:C.light}}>—</span>}</td>
                         <td style={{padding:"9px 13px",fontSize:12}}>{j.applianceAge?`${j.applianceAge}yr`:<span style={{color:C.light}}>—</span>}</td>
